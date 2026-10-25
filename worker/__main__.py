@@ -7,6 +7,7 @@ from collections.abc import Callable
 import psycopg
 
 from app.config import Settings, get_settings
+from worker.cluster import run_cluster
 from worker.embed import run_embed
 from worker.fetch import FetchOptions, run_fetch
 
@@ -31,9 +32,20 @@ def embed_stage(conn: psycopg.Connection, settings: Settings) -> int:
     return 0
 
 
+def cluster_stage(conn: psycopg.Connection, settings: Settings) -> int:
+    summary = run_cluster(conn)
+    print(
+        f"clustered {summary.articles} articles: {summary.joined} joined an existing cluster, "
+        f"{summary.created} started a new one; {summary.asked} borderline, "
+        f"{summary.asked_yes} confirmed"
+    )
+    return 0
+
+
 STAGES: dict[str, Callable[[psycopg.Connection, Settings], int]] = {
     "fetch": fetch_stage,
     "embed": embed_stage,
+    "cluster": cluster_stage,
 }
 
 

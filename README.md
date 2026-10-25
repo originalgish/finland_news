@@ -11,9 +11,10 @@ The full design and build order are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_P
 - [x] Phase 1: fetch (`make run-worker STAGE=fetch`)
 - [x] Phase 2: normalize and exact dedupe
 - [x] Phase 3: embeddings (`make run-worker STAGE=embed`)
-- [ ] Phase 4 onward: see the plan
+- [x] Phase 4: clustering (`make run-worker STAGE=cluster`). Pairs with cosine 0.80 or more merge. Borderline pairs (0.60 to 0.80) start new clusters until the Phase 5 same-event check exists.
+- [ ] Phase 5 onward: see the plan
 
-The web app and the later worker stages are not written yet. Today the fetch stage downloads the five feeds, stores new and changed articles by canonical URL, and records each attempt in `fetch_log`. The embed stage gives each article a 384-dimension vector of its title and summary, using a multilingual model baked into the worker image.
+The web app and the later worker stages are not written yet. Today the fetch stage downloads the five feeds, stores new and changed articles by canonical URL, and records each attempt in `fetch_log`. The embed stage gives each article a 384-dimension vector of its title and summary, using a multilingual model baked into the worker image. The cluster stage groups articles about the same event. Its thresholds were calibrated on hand-labelled pairs in [tests/fixtures/cluster_calibration.csv](tests/fixtures/cluster_calibration.csv). Re-check them if the embedding model changes.
 
 ## Quick start
 
@@ -42,6 +43,7 @@ make psql                   # open a psql shell on the dev database
 | `make css` | Build Tailwind CSS (needs `web/static/input.css`, phase 6) |
 | `make run-worker STAGE=fetch` | Download feeds and store new articles (phases 1-2) |
 | `make run-worker STAGE=embed` | Embed every article that has no vector yet (phase 3) |
+| `make run-worker STAGE=cluster` | Group new articles into events (phase 4) |
 
 The migration database test is skipped unless `TEST_DATABASE_URL` is set. It creates and drops its own database, so the role needs `CREATEDB`. Use the port from `DB_HOST_PORT`:
 
@@ -63,7 +65,7 @@ Settings come from `.env`. [.env.example](.env.example) lists them all.
 ```
 app/          shared config and the migration runner (python -m app.migrate)
 migrations/   numbered SQL files, applied in order
-worker/       fetch, normalize, dedupe, embed (phases 1-3); cluster, enrich, digest (later)
+worker/       fetch, normalize, dedupe, embed, cluster (phases 1-4); enrich, digest (later)
 web/          Flask + HTMX app (phase 6)
 docker/       Dockerfiles for the web and worker images
 tests/        pytest suite
