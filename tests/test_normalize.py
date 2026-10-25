@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -37,6 +38,11 @@ LATER = datetime(2026, 10, 26, 12, 0, tzinfo=UTC)
 )
 def test_canonical_url_removes_tracking_and_normalizes(url, expected):
     assert canonical_url(url) == expected
+
+
+def test_origin_param_is_only_stripped_for_yle():
+    assert canonical_url("https://www.hs.fi/x?origin=helsinki") == "https://www.hs.fi/x?origin=helsinki"
+    assert canonical_url("https://yle.fi/a/1?origin=rss&b=2") == "https://yle.fi/a/1?b=2"
 
 
 def test_canonical_url_is_stable_for_its_own_output():
@@ -155,6 +161,26 @@ def test_guid_equal_to_another_items_link_is_dropped():
     assert second.guid == "https://www.hs.fi/b.html"
 
 
+def test_missing_guid_falls_back_to_a_hash_of_title_and_date():
+    entry = _entry(link="https://www.hs.fi/a.html", title="A", published="Sun, 25 Oct 2026 10:00:00 GMT")
+    moved = entry | {"link": "https://www.hs.fi/moved.html"}
+    other_day = entry | {"published": "Mon, 26 Oct 2026 10:00:00 GMT"}
+
+    (first,) = normalize_entries([entry], FETCHED, FETCHED)
+    (again,) = normalize_entries([moved], FETCHED, LATER)
+    (later,) = normalize_entries([other_day], FETCHED, LATER)
+
+    assert first.guid.startswith("sha256:")
+    assert again.guid == first.guid
+    assert later.guid != first.guid
+
+
+def test_missing_guid_and_date_leaves_guid_empty():
+    (article,) = normalize_entries([_entry(link="https://www.hs.fi/a.html", title="A")], FETCHED, FETCHED)
+
+    assert article.guid is None
+
+
 def test_guid_equal_to_own_link_is_kept():
     entry = _entry(id="https://yle.fi/a/1", link="https://yle.fi/a/1?origin=rss", title="A")
 
@@ -183,6 +209,19 @@ def test_fixture_feeds_normalize_cleanly(filename, expected_count):
     assert all(a.title and a.url_canonical.startswith("https://") for a in articles)
     assert all("utm_" not in a.url_canonical and "origin=" not in a.url_canonical for a in articles)
     assert all(a.published_at <= FETCHED for a in articles)
+
+
+@pytest.mark.parametrize("filename", ["yle.xml", "helsingin_sanomat.xml", "ilta_sanomat.xml", "kauppalehti.xml"])
+def test_fixture_summaries_are_plain_text(filename):
+    entries = feedparser.parse((FIXTURES / filename).read_bytes()).entries
+
+    summaries = [a.summary for a in normalize_entries(entries, FETCHED, FETCHED) if a.summary]
+
+    assert summaries
+    for summary in summaries:
+        assert len(summary) <= SUMMARY_LIMIT
+        assert "<" not in summary and "­" not in summary
+        assert not re.search(r"&(\w+|#\d+);|\s{2}", summary)
 
 
 def test_iltalehti_fixture_has_no_summaries():

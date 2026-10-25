@@ -193,6 +193,17 @@ def test_timeouts_are_retried_then_reported():
     assert len(delays) == 3
 
 
+@respx.mock
+def test_non_transport_httpx_errors_are_reported_not_raised():
+    respx.get(YLE_URL).mock(side_effect=httpx.DecodingError("broken gzip"))
+
+    result = fetch(source())
+
+    assert not result.success
+    assert result.outcome == "error"
+    assert result.error.startswith("DecodingError")
+
+
 @pytest.mark.parametrize("status", [403, 404, 410])
 @respx.mock
 def test_client_errors_are_not_retried(status):

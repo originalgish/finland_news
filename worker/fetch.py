@@ -148,7 +148,9 @@ async def fetch_source(
 
     try:
         await _fetch(client, source, headers, previous_items, options, result)
-    except httpx.TransportError as exc:
+    except (httpx.HTTPError, httpx.InvalidURL) as exc:
+        # Any httpx failure belongs to this source only. It must not abort the
+        # other sources or cost this one its fetch_log row.
         _fail(result, "error", f"{type(exc).__name__}: {exc}")
 
     result.duration_ms = round((time.perf_counter() - started) * 1000)

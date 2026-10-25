@@ -121,6 +121,20 @@ def test_five_consecutive_failures_disable_a_source(migrated_conn):
     assert yle_rows == 5
 
 
+def test_permanent_redirect_updates_the_stored_feed_url(migrated_conn):
+    new_url = "https://yle.fi/rss/uutiset/uusi"
+    with respx.mock() as router:
+        serve_feeds(router, skip=(YLE_URL,))
+        router.get(YLE_URL).mock(return_value=httpx.Response(301, headers={"Location": new_url}))
+        router.get(new_url).mock(
+            return_value=httpx.Response(200, content=(FIXTURES / "yle.xml").read_bytes())
+        )
+        run_fetch(migrated_conn, options())
+
+    stored = migrated_conn.execute("SELECT feed_url FROM sources WHERE name = 'Yle'").fetchone()[0]
+    assert stored == new_url
+
+
 def test_a_success_resets_the_failure_count(migrated_conn):
     with respx.mock() as router:
         serve_feeds(router, status_overrides={YLE_URL: 404})

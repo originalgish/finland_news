@@ -3,15 +3,16 @@
 Pure functions only. Storage and deduplication live in dedupe.py.
 """
 
+import hashlib
 import html
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from time import struct_time
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import SplitResult, parse_qsl, urlencode, urlsplit, urlunsplit
 from zoneinfo import ZoneInfo
 
 from selectolax.lexbor import LexborHTMLParser
@@ -19,8 +20,8 @@ from selectolax.lexbor import LexborHTMLParser
 FEED_TIMEZONE = ZoneInfo("Europe/Helsinki")
 SUMMARY_LIMIT = 500
 
-# Tracking parameters removed from article URLs. Yle appends origin=rss to RSS links.
-TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid", "origin"}
+# Tracking parameters removed from every article URL.
+TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
 TRACKING_PREFIXES = ("utm_",)
 
 SOFT_HYPHEN = "­"
@@ -43,6 +44,7 @@ def canonical_url(url: str) -> str:
 
     Lower-cases scheme and host, drops fragments, tracking parameters and
     AMP markers, sorts the remaining query, and removes a trailing slash.
+    Then applies the outlet's hook from SOURCE_URL_HOOKS, if it has one.
     """
     parts = urlsplit(url.strip())
     path = parts.path
@@ -55,14 +57,39 @@ def canonical_url(url: str) -> str:
         for key, value in parse_qsl(parts.query, keep_blank_values=True)
         if not _is_tracking(key) and key != "amp"
     )
-    return urlunsplit(
-        (parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query), "")
+    cleaned = SplitResult(
+        parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query), ""
     )
+    hook = SOURCE_URL_HOOKS.get((parts.hostname or "").removeprefix("www."))
+    if hook is not None:
+        cleaned = hook(cleaned)
+    return urlunsplit(cleaned)
 
 
 def _is_tracking(key: str) -> bool:
     key = key.lower()
     return key in TRACKING_PARAMS or key.startswith(TRACKING_PREFIXES)
+
+
+def _drop_query_params(parts: SplitResult, names: set[str]) -> SplitResult:
+    query = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key not in names
+    ]
+    return parts._replace(query=urlencode(query))
+
+
+def _yle_url(parts: SplitResult) -> SplitResult:
+    # Yle appends origin=rss to every RSS link. Other sites may use "origin" for real.
+    return _drop_query_params(parts, {"origin"})
+
+
+# Per-outlet fixes for URL quirks the generic rules do not cover, keyed by host
+# without "www.". Each hook gets the already-cleaned URL parts.
+SOURCE_URL_HOOKS: dict[str, Callable[[SplitResult], SplitResult]] = {
+    "yle.fi": _yle_url,
+}
 
 
 def clean_text(value: str | None) -> str:
@@ -104,15 +131,23 @@ def parse_published(
     Missing dates fall back to fetched_at. Naive dates are read as Helsinki
     time. Future dates are clamped to now.
     """
+    value = feed_date(raw, parsed)
+    if value is None:
+        return fetched_at
+    return min(value, now)
+
+
+def feed_date(raw: str | None, parsed: struct_time | None) -> datetime | None:
+    """The entry's own date in UTC, unclamped, or None when the feed gave none we can read."""
     value = _parse_date_string(raw)
     if value is None and parsed is not None:
         # feedparser already converted this to UTC, e.g. for "25 Oct 26 14:00 UTC".
         value = datetime(*parsed[:6], tzinfo=UTC)
     if value is None:
-        return fetched_at
+        return None
     if value.tzinfo is None:
         value = value.replace(tzinfo=FEED_TIMEZONE)
-    return min(value.astimezone(UTC), now)
+    return value.astimezone(UTC)
 
 
 def _parse_date_string(raw: str | None) -> datetime | None:
@@ -156,20 +191,20 @@ def normalize_entries(
             canonical = canonical_url(link)
         except ValueError:
             continue
+        raw_date = entry.get("published") or entry.get("updated")
+        parsed_date = entry.get("published_parsed") or entry.get("updated_parsed")
+        guid = _guid(entry.get("id"), link, links) or _fallback_guid(
+            title, feed_date(raw_date, parsed_date)
+        )
         articles.append(
             Article(
                 url=link,
                 url_canonical=canonical,
-                guid=_guid(entry.get("id"), link, links),
+                guid=guid,
                 title=title,
                 summary=clean_summary(entry.get("summary")),
                 feed_categories=feed_categories(entry),
-                published_at=parse_published(
-                    entry.get("published") or entry.get("updated"),
-                    entry.get("published_parsed") or entry.get("updated_parsed"),
-                    fetched_at,
-                    now,
-                ),
+                published_at=parse_published(raw_date, parsed_date, fetched_at, now),
             )
         )
     return articles
@@ -187,3 +222,15 @@ def _guid(raw_id: str | None, own_link: str, all_links: list[str]) -> str | None
     if guid != own_link and guid in all_links:
         return None
     return guid
+
+
+def _fallback_guid(title: str, published: datetime | None) -> str | None:
+    """A stable id for items the feed gives no usable id: hash of title and date.
+
+    Needs the feed's own date. Recurring headlines (daily weather, for example)
+    would otherwise share one id and be merged.
+    """
+    if published is None:
+        return None
+    digest = hashlib.sha256(f"{title}\n{published.isoformat()}".encode()).hexdigest()
+    return f"sha256:{digest}"
