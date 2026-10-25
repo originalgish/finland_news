@@ -64,7 +64,7 @@ def test_migrate_creates_schema_and_is_idempotent(scratch_conn):
     first = migrate(scratch_conn)
     second = migrate(scratch_conn)
 
-    assert first == ["001_init"]
+    assert first == ["001_init", "002_seed_sources"]
     assert second == []
 
     tables = {
@@ -74,3 +74,23 @@ def test_migrate_creates_schema_and_is_idempotent(scratch_conn):
         )
     }
     assert {"sources", "articles", "clusters", "tags", "views", "digests"} <= tables
+
+
+def test_seed_loads_outlets_tags_and_category_map(scratch_conn):
+    migrate(scratch_conn)
+
+    sources = {
+        row[0]: row[1]
+        for row in scratch_conn.execute("SELECT name, feed_url FROM sources")
+    }
+    assert set(sources) == {"Yle", "Helsingin Sanomat", "Ilta-Sanomat", "Iltalehti", "Kauppalehti"}
+    assert all(url.startswith("https://") for url in sources.values())
+
+    tags = {row[0] for row in scratch_conn.execute("SELECT name FROM tags")}
+    assert tags == {
+        "politics", "economy", "business", "sports", "culture", "crime",
+        "health", "tech", "world", "local", "weather",
+    }
+
+    mapped = scratch_conn.execute("SELECT count(*) FROM feed_category_map").fetchone()[0]
+    assert mapped > 0
