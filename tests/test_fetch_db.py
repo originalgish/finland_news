@@ -64,14 +64,35 @@ def test_first_run_stores_items_and_second_run_is_unchanged(migrated_conn):
 
     assert {r.source.name: r.items_found for r in first} == EXPECTED_ITEMS
     assert {r.outcome for r in first} == {"ok"}
+    stored = migrated_conn.execute("SELECT count(*) FROM articles").fetchone()[0]
+    assert sum(r.items_new for r in first) == stored > 0
 
     with respx.mock() as router:
         serve_feeds(router)
         second = run_fetch(migrated_conn, options())
 
     assert {r.outcome for r in second} == {"unchanged"}
+    assert sum(r.items_new for r in second) == 0
     logged = migrated_conn.execute("SELECT count(*) FROM fetch_log").fetchone()[0]
     assert logged == 2 * len(FEEDS)
+
+
+def test_parsing_the_same_feeds_again_inserts_no_rows(migrated_conn):
+    with respx.mock() as router:
+        serve_feeds(router)
+        run_fetch(migrated_conn, options())
+    stored = migrated_conn.execute("SELECT count(*) FROM articles").fetchone()[0]
+    # Forget the stored fingerprints so the same bodies are parsed again.
+    migrated_conn.execute("UPDATE sources SET body_hash = NULL, etag = NULL, last_modified = NULL")
+
+    with respx.mock() as router:
+        serve_feeds(router)
+        again = run_fetch(migrated_conn, options())
+
+    assert {r.outcome for r in again} == {"ok"}
+    assert sum(r.items_found for r in again) > 0
+    assert sum(r.items_new for r in again) == 0
+    assert migrated_conn.execute("SELECT count(*) FROM articles").fetchone()[0] == stored
 
 
 def test_five_consecutive_failures_disable_a_source(migrated_conn):

@@ -24,7 +24,8 @@ def main(argv: list[str] | None = None) -> int:
     for result in results:
         line = (
             f"{result.source.name:<18} {result.outcome:<12} "
-            f"items={result.items_found:<4} status={result.status_code} {result.error or ''}"
+            f"items={result.items_found:<4} new={result.items_new:<4} "
+            f"status={result.status_code} {result.error or ''}"
         )
         print(line.rstrip())
     succeeded = sum(result.success for result in results)

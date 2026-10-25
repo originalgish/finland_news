@@ -9,9 +9,10 @@ The full design and build order are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_P
 - [x] Phase 0: project setup and initial schema
 - [x] Seed: five outlets, starter tags, category mappings
 - [x] Phase 1: fetch (`make run-worker STAGE=fetch`)
-- [ ] Phase 2 onward: see the plan
+- [x] Phase 2: normalize and exact dedupe
+- [ ] Phase 3 onward: see the plan
 
-The web app and the later worker stages are not written yet. Today the fetch stage downloads the five feeds and records each attempt in `fetch_log`, and the database holds the migrated schema.
+The web app and the later worker stages are not written yet. Today the fetch stage downloads the five feeds, stores new and changed articles by canonical URL, and records each attempt in `fetch_log`.
 
 ## Quick start
 
@@ -58,7 +59,7 @@ Settings come from `.env`. [.env.example](.env.example) lists them all.
 ```
 app/          shared config and the migration runner (python -m app.migrate)
 migrations/   numbered SQL files, applied in order
-worker/       fetch, normalize, embed, cluster, enrich, digest (phase 1 onward)
+worker/       fetch, normalize, dedupe (phases 1-2); embed, cluster, enrich, digest (later)
 web/          Flask + HTMX app (phase 6)
 docker/       Dockerfiles for the web and worker images
 tests/        pytest suite

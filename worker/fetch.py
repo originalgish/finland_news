@@ -1,9 +1,9 @@
 """Stage 1: download each enabled feed and parse it.
 
 Every source gets a conditional GET (ETag and Last-Modified). A body whose hash
-matches the stored one is recorded as `unchanged` and not parsed again. Each
-attempt writes one fetch_log row and updates the source's fetch state. Parsed
-entries are returned in memory for the next stage.
+matches the stored one is recorded as `unchanged` and not parsed again. Parsed
+entries are normalized and stored (normalize.py, dedupe.py). Each attempt writes
+one fetch_log row and updates the source's fetch state, in the same transaction.
 """
 
 import asyncio
@@ -21,6 +21,9 @@ import feedparser
 import httpx
 import psycopg
 from psycopg.rows import class_row
+
+from worker.dedupe import store_articles
+from worker.normalize import normalize_entries
 
 MAX_CONSECUTIVE_FAILURES = 5
 CONCURRENCY = 5
@@ -49,7 +52,7 @@ INSERT_LOG_SQL = """
 INSERT INTO fetch_log (source_id, started_at, duration_ms, status_code, outcome,
                        items_found, items_new, error)
 VALUES (%(source_id)s, %(started_at)s, %(duration_ms)s, %(status_code)s, %(outcome)s,
-        %(items_found)s, 0, %(error)s)
+        %(items_found)s, %(items_new)s, %(error)s)
 """
 
 # COALESCE keeps the stored value when a result has nothing new to say.
@@ -98,6 +101,7 @@ class FetchResult:
     status_code: int | None = None
     duration_ms: int = 0
     items_found: int = 0
+    items_new: int = 0
     error: str | None = None
     entries: list[dict[str, Any]] = field(default_factory=list)
     new_feed_url: str | None = None
@@ -297,8 +301,15 @@ def last_item_counts(conn: psycopg.Connection) -> dict[int, int]:
 
 
 def record_results(conn: psycopg.Connection, results: list[FetchResult]) -> None:
+    now = datetime.now(UTC)
     with conn.transaction():
         for result in results:
+            if result.success and result.entries:
+                articles = normalize_entries(
+                    result.entries, fetched_at=result.started_at, now=now
+                )
+                result.items_new = store_articles(conn, result.source.id, articles)
+
             failures = 0 if result.success else result.source.consecutive_failures + 1
             disabled = failures >= MAX_CONSECUTIVE_FAILURES
             reason = None
@@ -311,6 +322,7 @@ def record_results(conn: psycopg.Connection, results: list[FetchResult]) -> None
                 "status_code": result.status_code,
                 "outcome": result.outcome,
                 "items_found": result.items_found,
+                "items_new": result.items_new,
                 "error": result.error,
                 "failures": failures,
                 "enabled": not disabled,
