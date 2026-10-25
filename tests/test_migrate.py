@@ -1,9 +1,4 @@
-import os
-import uuid
-
-import psycopg
 import pytest
-from psycopg.conninfo import make_conninfo
 
 from app.migrate import MIGRATIONS_DIR, discover, migrate
 
@@ -38,26 +33,6 @@ def test_shipped_migrations_are_discoverable():
     names = [p.name for p in discover(MIGRATIONS_DIR)]
 
     assert names[0] == "001_init.sql"
-
-
-@pytest.fixture
-def scratch_conn():
-    """A connection to a freshly created database, dropped afterwards.
-
-    Needs a role allowed to CREATE DATABASE, which the compose superuser is.
-    """
-    url = os.environ.get("TEST_DATABASE_URL")
-    if not url:
-        pytest.skip("TEST_DATABASE_URL not set")
-    name = f"migrate_test_{uuid.uuid4().hex[:8]}"
-    with psycopg.connect(url, autocommit=True) as admin:
-        admin.execute(f'CREATE DATABASE "{name}"')
-    try:
-        with psycopg.connect(make_conninfo(url, dbname=name)) as conn:
-            yield conn
-    finally:
-        with psycopg.connect(url, autocommit=True) as admin:
-            admin.execute(f'DROP DATABASE "{name}" WITH (FORCE)')
 
 
 def test_migrate_creates_schema_and_is_idempotent(scratch_conn):

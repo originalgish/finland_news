@@ -7,10 +7,11 @@ The full design and build order are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_P
 ## Status
 
 - [x] Phase 0: project setup and initial schema
-- [ ] Phase 1: fetch
+- [x] Seed: five outlets, starter tags, category mappings
+- [x] Phase 1: fetch (`make run-worker STAGE=fetch`)
 - [ ] Phase 2 onward: see the plan
 
-The web app and the worker stages are not written yet, so the only thing that runs today is the database and its migrations.
+The web app and the later worker stages are not written yet. Today the fetch stage downloads the five feeds and records each attempt in `fetch_log`, and the database holds the migrated schema.
 
 ## Quick start
 

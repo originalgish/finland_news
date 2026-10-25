@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 @dataclass(frozen=True)
 class Settings:
     database_url: str
+    user_agent: str
 
 
 def get_settings() -> Settings:
@@ -17,4 +18,7 @@ def get_settings() -> Settings:
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL is not set")
-    return Settings(database_url=database_url)
+    return Settings(
+        database_url=database_url,
+        user_agent=os.environ.get("USER_AGENT", "FinlandToday/0.1"),
+    )
