@@ -1,0 +1,7 @@
+news.example.com {
+    basic_auth {
+        denis <bcrypt hash from `caddy hash-password`>
+    }
+    encode zstd gzip
+    reverse_proxy web:8000
+}

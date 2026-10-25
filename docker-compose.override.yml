@@ -1,0 +1,13 @@
+# Local development. Compose merges this file automatically with docker-compose.yml.
+# Publishes db and web on the host and bind-mounts the code. Caddy stays off
+# because it sits behind the `prod` profile.
+services:
+  db:
+    ports: ["${DB_HOST_PORT:-5432}:5432"]
+
+  web:
+    ports: ["5000:8000"]
+    volumes: [".:/app"]
+
+  worker:
+    volumes: [".:/app"]
