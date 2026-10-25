@@ -10,9 +10,10 @@ The full design and build order are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_P
 - [x] Seed: five outlets, starter tags, category mappings
 - [x] Phase 1: fetch (`make run-worker STAGE=fetch`)
 - [x] Phase 2: normalize and exact dedupe
-- [ ] Phase 3 onward: see the plan
+- [x] Phase 3: embeddings (`make run-worker STAGE=embed`)
+- [ ] Phase 4 onward: see the plan
 
-The web app and the later worker stages are not written yet. Today the fetch stage downloads the five feeds, stores new and changed articles by canonical URL, and records each attempt in `fetch_log`.
+The web app and the later worker stages are not written yet. Today the fetch stage downloads the five feeds, stores new and changed articles by canonical URL, and records each attempt in `fetch_log`. The embed stage gives each article a 384-dimension vector of its title and summary, using a multilingual model baked into the worker image.
 
 ## Quick start
 
@@ -39,7 +40,8 @@ make psql                   # open a psql shell on the dev database
 | `make test` | Run the test suite |
 | `make lint` | Run ruff |
 | `make css` | Build Tailwind CSS (needs `web/static/input.css`, phase 6) |
-| `make run-worker STAGE=fetch` | Run one worker stage in the worker container (phase 1 onward) |
+| `make run-worker STAGE=fetch` | Download feeds and store new articles (phases 1-2) |
+| `make run-worker STAGE=embed` | Embed every article that has no vector yet (phase 3) |
 
 The migration database test is skipped unless `TEST_DATABASE_URL` is set. It creates and drops its own database, so the role needs `CREATEDB`. Use the port from `DB_HOST_PORT`:
 
@@ -53,13 +55,15 @@ Settings come from `.env`. [.env.example](.env.example) lists them all.
 
 - `DB_HOST_PORT` sets the host port for the dev database (default `5432`). Change it if something else already uses that port.
 - `COMPOSE_PROFILES=prod` on the server starts Caddy. Leave it unset locally.
+- `EMBED_MODEL` and `EMBED_DIM` pick the embedding model. `EMBED_DIM` must equal the `vector(384)` size in the schema. Changing the model means a new migration and re-embedding every article.
+- `EMBED_CACHE_DIR` is where the model weights are stored. The worker image sets it to `/opt/models`, so containers never download the model at start. Leave it unset elsewhere.
 
 ## Layout
 
 ```
 app/          shared config and the migration runner (python -m app.migrate)
 migrations/   numbered SQL files, applied in order
-worker/       fetch, normalize, dedupe (phases 1-2); embed, cluster, enrich, digest (later)
+worker/       fetch, normalize, dedupe, embed (phases 1-3); cluster, enrich, digest (later)
 web/          Flask + HTMX app (phase 6)
 docker/       Dockerfiles for the web and worker images
 tests/        pytest suite

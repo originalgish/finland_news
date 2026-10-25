@@ -5,11 +5,17 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
+DEFAULT_EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+DEFAULT_EMBED_DIM = 384
+
 
 @dataclass(frozen=True)
 class Settings:
     database_url: str
     user_agent: str
+    embed_model: str
+    embed_dim: int
+    embed_cache_dir: str | None
 
 
 def get_settings() -> Settings:
@@ -21,4 +27,7 @@ def get_settings() -> Settings:
     return Settings(
         database_url=database_url,
         user_agent=os.environ.get("USER_AGENT", "FinlandToday/0.1"),
+        embed_model=os.environ.get("EMBED_MODEL", DEFAULT_EMBED_MODEL),
+        embed_dim=int(os.environ.get("EMBED_DIM", DEFAULT_EMBED_DIM)),
+        embed_cache_dir=os.environ.get("EMBED_CACHE_DIR") or None,
     )

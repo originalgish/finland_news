@@ -21,7 +21,11 @@ ON CONFLICT (url_canonical) DO UPDATE
        updated_at = now(),
        -- a changed headline must be translated again
        enriched_at = CASE WHEN articles.title IS DISTINCT FROM EXCLUDED.title
-                          THEN NULL ELSE articles.enriched_at END
+                          THEN NULL ELSE articles.enriched_at END,
+       -- changed text must be embedded again, or the vector goes stale
+       embedded_at = CASE WHEN articles.title IS DISTINCT FROM EXCLUDED.title
+                            OR articles.summary IS DISTINCT FROM EXCLUDED.summary
+                          THEN NULL ELSE articles.embedded_at END
 RETURNING id, (xmax = 0) AS inserted
 """
 
@@ -37,7 +41,10 @@ SET url = %(url)s,
     summary = %(summary)s,
     updated_at = now(),
     enriched_at = CASE WHEN articles.title IS DISTINCT FROM %(title)s
-                       THEN NULL ELSE articles.enriched_at END
+                       THEN NULL ELSE articles.enriched_at END,
+    embedded_at = CASE WHEN articles.title IS DISTINCT FROM %(title)s
+                         OR articles.summary IS DISTINCT FROM %(summary)s
+                       THEN NULL ELSE articles.embedded_at END
 WHERE id = %(id)s
 """
 
