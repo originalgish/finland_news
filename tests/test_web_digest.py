@@ -99,6 +99,18 @@ def test_rss_has_one_item_per_day_newest_first(client):
     assert titles == ["Finland News digest, 2026-10-26", "Finland News digest, 2026-10-25"]
 
 
+def test_rss_links_use_the_scheme_and_host_caddy_forwards(client):
+    response = client.get(
+        "/digest.xml",
+        headers={"X-Forwarded-Proto": "https", "X-Forwarded-Host": "news.example.com"},
+    )
+
+    root = ET.fromstring(response.data)
+    links = [link.text for link in root.iter("link")]
+    assert links[0] == "https://news.example.com/digest"
+    assert all(link.startswith("https://news.example.com/") for link in links)
+
+
 def test_rss_description_carries_the_stored_page(client):
     root = ET.fromstring(client.get("/digest.xml").data)
     first = root.find("./channel/item/description")

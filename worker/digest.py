@@ -24,7 +24,7 @@ from worker.llm import Claude, LLMError
 DIGEST_TIMEZONE = ZoneInfo("Europe/Helsinki")
 WINDOW = timedelta(hours=24)
 DIGEST_SIZE = 8
-# Score weights, tuned after a week of digests. A story's score is
+# Score weights: the plan's starting values, to tune after a week of digests. A story's score is
 #   SOURCE_WEIGHT * source_count + RECENCY_WEIGHT * recency + TAG_WEIGHT * tag_weight
 SOURCE_WEIGHT = 2.0
 RECENCY_WEIGHT = 1.0

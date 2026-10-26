@@ -9,6 +9,7 @@ from contextlib import ExitStack
 from flask import Flask, g, request
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.config import get_settings
 from web.helpers import LANGS, display, initials, time_ago
@@ -17,6 +18,9 @@ from web.routes import admin, clusters, digest, feed, search, site, sources, tag
 
 def create_app(database_url: str | None = None) -> Flask:
     app = Flask(__name__)
+    # In production Caddy terminates HTTPS and forwards the original scheme and host.
+    # Trusting that one hop keeps absolute links, such as those in /digest.xml, on https.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)  # type: ignore[method-assign]
     url = database_url or get_settings().database_url
     pool = ConnectionPool(
         url,
