@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 
 DEFAULT_EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 DEFAULT_EMBED_DIM = 384
+DEFAULT_LLM_MODEL = "claude-haiku-5-5"
+DEFAULT_LLM_MAX_ARTICLES = 500
 
 
 @dataclass(frozen=True)
@@ -16,6 +18,9 @@ class Settings:
     embed_model: str
     embed_dim: int
     embed_cache_dir: str | None
+    anthropic_api_key: str | None
+    llm_model: str
+    llm_max_articles_per_run: int
 
 
 def get_settings() -> Settings:
@@ -30,4 +35,9 @@ def get_settings() -> Settings:
         embed_model=os.environ.get("EMBED_MODEL", DEFAULT_EMBED_MODEL),
         embed_dim=int(os.environ.get("EMBED_DIM", DEFAULT_EMBED_DIM)),
         embed_cache_dir=os.environ.get("EMBED_CACHE_DIR") or None,
+        anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
+        llm_model=os.environ.get("LLM_MODEL", DEFAULT_LLM_MODEL),
+        llm_max_articles_per_run=int(
+            os.environ.get("LLM_MAX_ARTICLES_PER_RUN", DEFAULT_LLM_MAX_ARTICLES)
+        ),
     )

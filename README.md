@@ -12,9 +12,12 @@ The full design and build order are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_P
 - [x] Phase 2: normalize and exact dedupe
 - [x] Phase 3: embeddings (`make run-worker STAGE=embed`)
 - [x] Phase 4: clustering (`make run-worker STAGE=cluster`). Pairs with cosine 0.80 or more merge. Borderline pairs (0.60 to 0.80) start new clusters until the Phase 5 same-event check exists.
-- [ ] Phase 5 onward: see the plan
+- [x] Phase 5: enrichment and tags (`make run-worker STAGE=tag`, `make run-worker STAGE=enrich`). The first live run translated all articles and wrote all cluster headlines. Tags carry definitions in the prompt, and every article now gets at least one tag and an English summary wherever the Finnish one has a summary. Crime tags fell from 29 to 21, but two accidents are still tagged crime.
+- [ ] Phase 6 onward: see the plan
 
-The web app and the later worker stages are not written yet. Today the fetch stage downloads the five feeds, stores new and changed articles by canonical URL, and records each attempt in `fetch_log`. The embed stage gives each article a 384-dimension vector of its title and summary, using a multilingual model baked into the worker image. The cluster stage groups articles about the same event. Its thresholds were calibrated on hand-labelled pairs in [tests/fixtures/cluster_calibration.csv](tests/fixtures/cluster_calibration.csv). Re-check them if the embedding model changes.
+The web app is not written yet. Today the fetch stage downloads the five feeds, stores new and changed articles by canonical URL, and records each attempt in `fetch_log`. The embed stage gives each article a 384-dimension vector of its title and summary, using a multilingual model baked into the worker image. The cluster stage groups articles about the same event. Its thresholds were calibrated on hand-labelled pairs in [tests/fixtures/cluster_calibration.csv](tests/fixtures/cluster_calibration.csv). Re-check them if the embedding model changes.
+
+The tag stage adds tags from feed categories and keyword rules, with no LLM. The enrich stage uses Claude (`LLM_MODEL`, default `claude-haiku-5-5`) to translate each article into English, add up to three tags from the starter list, and write one English headline per cluster. The cluster stage also asks Claude to confirm borderline pairs when a key is set. Without a key, enrich stops and cluster starts new clusters for borderline pairs.
 
 ## Quick start
 
@@ -43,7 +46,9 @@ make psql                   # open a psql shell on the dev database
 | `make css` | Build Tailwind CSS (needs `web/static/input.css`, phase 6) |
 | `make run-worker STAGE=fetch` | Download feeds and store new articles (phases 1-2) |
 | `make run-worker STAGE=embed` | Embed every article that has no vector yet (phase 3) |
-| `make run-worker STAGE=cluster` | Group new articles into events (phase 4) |
+| `make run-worker STAGE=cluster` | Group new articles into events (phase 4). Uses Claude for borderline pairs when `ANTHROPIC_API_KEY` is set |
+| `make run-worker STAGE=tag` | Add tags from feed categories and keyword rules (phase 5, no LLM) |
+| `make run-worker STAGE=enrich` | Translate and tag new articles, and write cluster headlines with Claude (phase 5). Needs `ANTHROPIC_API_KEY` |
 
 The migration database test is skipped unless `TEST_DATABASE_URL` is set. It creates and drops its own database, so the role needs `CREATEDB`. Use the port from `DB_HOST_PORT`:
 
@@ -59,13 +64,16 @@ Settings come from `.env`. [.env.example](.env.example) lists them all.
 - `COMPOSE_PROFILES=prod` on the server starts Caddy. Leave it unset locally.
 - `EMBED_MODEL` and `EMBED_DIM` pick the embedding model. `EMBED_DIM` must equal the `vector(384)` size in the schema. Changing the model means a new migration and re-embedding every article.
 - `EMBED_CACHE_DIR` is where the model weights are stored. The worker image sets it to `/opt/models`, so containers never download the model at start. Leave it unset elsewhere.
+- `ANTHROPIC_API_KEY` enables the LLM steps: enrich, and the same-event check in cluster. Keep the key in `.env`, which is never committed.
+- `LLM_MODEL` picks the Claude model. The default is `claude-haiku-5-5`.
+- `LLM_MAX_ARTICLES_PER_RUN` caps how many articles one enrich run sends to the model (default 500). Unfinished articles are picked up by the next run.
 
 ## Layout
 
 ```
 app/          shared config and the migration runner (python -m app.migrate)
 migrations/   numbered SQL files, applied in order
-worker/       fetch, normalize, dedupe, embed, cluster (phases 1-4); enrich, digest (later)
+worker/       fetch, normalize, dedupe, embed, cluster, tagging, enrich (phases 1-5); digest (later)
 web/          Flask + HTMX app (phase 6)
 docker/       Dockerfiles for the web and worker images
 tests/        pytest suite

@@ -9,7 +9,10 @@ import psycopg
 from app.config import Settings, get_settings
 from worker.cluster import run_cluster
 from worker.embed import run_embed
+from worker.enrich import make_same_event_judge, run_enrich
 from worker.fetch import FetchOptions, run_fetch
+from worker.llm import Claude
+from worker.tagging import apply_tags
 
 
 def fetch_stage(conn: psycopg.Connection, settings: Settings) -> int:
@@ -33,12 +36,41 @@ def embed_stage(conn: psycopg.Connection, settings: Settings) -> int:
 
 
 def cluster_stage(conn: psycopg.Connection, settings: Settings) -> int:
-    summary = run_cluster(conn)
+    llm = None
+    same_event = None
+    if settings.anthropic_api_key:
+        llm = Claude.from_api_key(settings.anthropic_api_key, settings.llm_model)
+        same_event = make_same_event_judge(conn, llm)
+    else:
+        print("same-event check off: ANTHROPIC_API_KEY is not set, so borderline pairs start new clusters")
+    summary = run_cluster(conn, same_event=same_event)
     print(
         f"clustered {summary.articles} articles: {summary.joined} joined an existing cluster, "
         f"{summary.created} started a new one; {summary.asked} borderline, "
         f"{summary.asked_yes} confirmed"
     )
+    if llm is not None:
+        print(f"llm usage: {llm.usage.summary()}")
+    return 0
+
+
+def tag_stage(conn: psycopg.Connection, settings: Settings) -> int:
+    summary = apply_tags(conn)
+    print(f"tags added: {summary.feed} from feed categories, {summary.rules} from keyword rules")
+    return 0
+
+
+def enrich_stage(conn: psycopg.Connection, settings: Settings) -> int:
+    if not settings.anthropic_api_key:
+        print("enrich needs ANTHROPIC_API_KEY in .env")
+        return 1
+    llm = Claude.from_api_key(settings.anthropic_api_key, settings.llm_model)
+    summary = run_enrich(conn, llm, settings.llm_max_articles_per_run)
+    print(
+        f"enriched {summary.articles} articles ({summary.retried} retried alone, "
+        f"{summary.still_missing} still missing); wrote {summary.headlines} cluster headlines"
+    )
+    print(f"llm usage: {llm.usage.summary()}")
     return 0
 
 
@@ -46,6 +78,8 @@ STAGES: dict[str, Callable[[psycopg.Connection, Settings], int]] = {
     "fetch": fetch_stage,
     "embed": embed_stage,
     "cluster": cluster_stage,
+    "tag": tag_stage,
+    "enrich": enrich_stage,
 }
 
 

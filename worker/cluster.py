@@ -174,5 +174,5 @@ def _join(conn: psycopg.Connection, article_id: int, cluster_id: int, embedding:
     )
 
 
-def run_cluster(conn: psycopg.Connection) -> ClusterSummary:
-    return cluster_pending(conn)
+def run_cluster(conn: psycopg.Connection, same_event: SameEvent | None = None) -> ClusterSummary:
+    return cluster_pending(conn, same_event=same_event)
