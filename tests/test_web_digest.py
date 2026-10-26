@@ -96,7 +96,7 @@ def test_rss_has_one_item_per_day_newest_first(client):
     assert response.mimetype == "application/rss+xml"
     root = ET.fromstring(response.data)
     titles = [item.findtext("title") for item in root.findall("./channel/item")]
-    assert titles == ["Finland Today digest, 2026-10-26", "Finland Today digest, 2026-10-25"]
+    assert titles == ["Finland News digest, 2026-10-26", "Finland News digest, 2026-10-25"]
 
 
 def test_rss_description_carries_the_stored_page(client):

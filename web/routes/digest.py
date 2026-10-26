@@ -46,13 +46,13 @@ def _rss(digests: list[dict[str, Any]]) -> str:
     """One RSS item per day, newest first. The description is the stored page."""
     rss = ET.Element("rss", version="2.0")
     channel = ET.SubElement(rss, "channel")
-    ET.SubElement(channel, "title").text = "Finland Today digest"
+    ET.SubElement(channel, "title").text = "Finland News digest"
     ET.SubElement(channel, "link").text = url_for("digest.latest", _external=True)
     ET.SubElement(channel, "description").text = "The stories that mattered most each day, from Finnish outlets."
     for stored in digests:
         day = stored["date"].isoformat()
         item = ET.SubElement(channel, "item")
-        ET.SubElement(item, "title").text = f"Finland Today digest, {day}"
+        ET.SubElement(item, "title").text = f"Finland News digest, {day}"
         ET.SubElement(item, "link").text = url_for("digest.on_day", day=day, _external=True)
         ET.SubElement(item, "guid", isPermaLink="false").text = f"digest-{day}"
         ET.SubElement(item, "pubDate").text = format_datetime(stored["created_at"])
