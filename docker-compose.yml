@@ -1,3 +1,10 @@
+# Container logs rotate at 10 MB, keeping three files per container.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -10,6 +17,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ft"]
       interval: 10s
     restart: unless-stopped
+    logging: *logging
 
   worker:
     build: { context: ., dockerfile: docker/worker.Dockerfile }
@@ -19,6 +27,7 @@ services:
     depends_on: { db: { condition: service_healthy } }
     command: ["supercronic", "/app/worker/crontab"]
     restart: unless-stopped
+    logging: *logging
 
   web:
     build: { context: ., dockerfile: docker/web.Dockerfile }
@@ -26,6 +35,7 @@ services:
     depends_on: { db: { condition: service_healthy } }
     command: ["gunicorn", "-w", "2", "-b", "0.0.0.0:8000", "web:create_app()"]
     restart: unless-stopped
+    logging: *logging
 
   # Only started with COMPOSE_PROFILES=prod (set on the server, not locally).
   caddy:
@@ -43,6 +53,7 @@ services:
       - caddy_data:/data
     depends_on: [web]
     restart: unless-stopped
+    logging: *logging
 
 volumes:
   pgdata:

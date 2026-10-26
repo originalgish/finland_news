@@ -60,4 +60,43 @@ The script refuses to run if `.env` is missing a required value. It never starts
 - Caddy's basic auth covers `/healthz` too. An external uptime check would need either credentials or a different route. The healthchecks.io pings come from the worker, so they do not need it.
 - The schedule runs inside the worker container. Its times are in [worker/crontab](worker/crontab) and are Helsinki time.
 - An alternative to basic auth is to serve the app only on a Tailscale address. That is still an open question in the plan; this setup uses basic auth.
-- Backups are not set up yet. That is Phase 10.
+- Container logs rotate at 10 MB, keeping three files per container. `docker compose -f docker-compose.yml logs` shows them.
+
+## 5. Backups and monitoring
+
+The backup runs from the server's crontab, not from the worker, because the dump goes through `docker compose`. Each night it dumps the database, checks that the dump can be read back, keeps 14 daily dumps and 8 weekly Sunday dumps, and copies the directory to the Storage Box.
+
+1. Create a Hetzner Storage Box and add the server user's SSH key to it. Then add an alias to `~/.ssh/config` with the Storage Box's host, user and port (23), so rsync can use it by name.
+2. Add these to `.env` on the server:
+
+   ```bash
+   BACKUP_DIR=/var/backups/finland-news
+   BACKUP_REMOTE=storagebox:ft-backups
+   HC_BACKUP_URL=https://hc-ping.com/<uuid>
+   ```
+
+   `BACKUP_REMOTE` is the rsync destination. The off-site copy uses `rsync --delete`, so it mirrors the local directory exactly. Point it at a directory that holds only these backups.
+
+3. Run the backup once by hand, then check the restore:
+
+   ```bash
+   scripts/backup.sh
+   scripts/restore-check.sh /var/backups/finland-news/ft-$(date +%F).dump
+   ```
+
+4. Add the nightly job with `crontab -e`, as the user that runs Docker:
+
+   ```
+   30 2 * * * /home/<user>/finland_news/scripts/backup.sh >> /home/<user>/ft-backup.log 2>&1
+   ```
+
+   The server clock is UTC by default. 02:30 UTC is 04:30 in Helsinki in winter and 05:30 in summer. Either is fine.
+
+5. In healthchecks.io, create three checks:
+   - **run**: period 12 hours, grace 1 hour. Its URL is `HC_FETCH_URL`, which the pipeline pings.
+   - **digest**: period 1 day, grace 1 hour. Its URL is `HC_DIGEST_URL`.
+   - **backup**: period 1 day, grace 1 hour. Its URL is `HC_BACKUP_URL`. The script pings `/fail` when any step fails.
+
+6. Turn on weekly server snapshots in the Hetzner console (the backups add-on, or manual snapshots). They are not automated here.
+
+Run `scripts/restore-check.sh` again after any schema change. It restores into a scratch database called `ft_restore_check`, then drops that database.

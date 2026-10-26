@@ -17,7 +17,7 @@ The full design and build order are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_P
 - [x] Phase 7: daily digest (`make run-worker STAGE=digest`). Each run scores the stories updated in the last 24 hours by outlet count, recency and tag weight, and Claude writes a headline and blurb for the top eight. The page is stored under today's date (Helsinki time) and served at `/digest` and `/digest/<date>`, with an RSS feed of the last 14 days at `/digest.xml`. A second run on the same day replaces the first.
 - [x] Phase 8: scheduling. `python -m worker run` chains fetch, tag, embed, cluster and enrich under one advisory lock, so two runs never overlap. The worker image runs supercronic on [worker/crontab](worker/crontab): the run at 06:00 and 17:00, the digest at 06:30, and maintenance at 03:15 (Helsinki time). Maintenance deletes `fetch_log` rows older than 90 days and runs `VACUUM ANALYZE`. A run stops at the first stage that fails. The fetch check gets a success ping only when the run finished and at least 60% of sources were fetched; otherwise it gets `/fail`.
 - [ ] Phase 9: deployment. `DEPLOY.md` has the server checklist, and `scripts/deploy.sh` pulls, builds, migrates and starts. Caddy serves HTTPS on `SITE_DOMAIN` behind basic auth, and only Caddy publishes ports. I tested that stack locally with a throwaway project, but it is not running on a server yet.
-- [ ] Phase 10 onward: see the plan
+- [ ] Phase 10: backups and monitoring. `scripts/backup.sh` runs nightly from the server's crontab. It dumps the database, checks the dump can be read back, keeps 14 daily and 8 weekly dumps, copies them to the Storage Box, and pings healthchecks.io. `scripts/restore-check.sh` restores a dump into a scratch database to prove it works. I tested both locally. The Storage Box, the server cron and the healthchecks.io checks still need setting up on the server, as DEPLOY.md describes.
 
 Open the app at `http://localhost:5000`, or `http://localhost:8080` when `WEB_HOST_PORT` is set to 8080. The feed, tags, views, sources and search all update in place with HTMX, so switching a view or adding a tag does not reload the page.
 
@@ -60,6 +60,8 @@ make psql                   # open a psql shell on the dev database
 | `make run-worker STAGE=digest` | Write today's digest with Claude's headlines and blurbs (phase 7). Needs `ANTHROPIC_API_KEY` |
 | `make run-worker STAGE=run` | Run the whole pipeline once: fetch, tag, embed, cluster, enrich (phase 8). Pings the fetch check (see Configuration to avoid that) |
 | `make run-worker STAGE=maintenance` | Delete `fetch_log` rows older than 90 days, then `VACUUM ANALYZE` (phase 8) |
+| `scripts/backup.sh` | Dump the database, check it, prune old dumps, copy them off the server, and ping `HC_BACKUP_URL` (phase 10). Run it from the server's crontab |
+| `scripts/restore-check.sh DUMP` | Restore a dump into a scratch database, print the key row counts, and drop the scratch database (phase 10) |
 
 The migration database test is skipped unless `TEST_DATABASE_URL` is set. It creates and drops its own database, so the role needs `CREATEDB`. Use the port from `DB_HOST_PORT`:
 
@@ -88,11 +90,11 @@ Settings come from `.env`. [.env.example](.env.example) lists them all.
 
 ```
 app/          shared config and the migration runner (python -m app.migrate)
-scripts/      deploy.sh, the server deploy (see DEPLOY.md)
+scripts/      deploy.sh, backup.sh and restore-check.sh (see DEPLOY.md)
 migrations/   numbered SQL files, applied in order
 worker/       fetch, normalize, dedupe, embed, cluster, tagging, enrich (phases 1-5); digest (phase 7);
               stages.py (one function per stage), pipeline.py (run, phase 8), maintenance.py,
-              health.py (healthchecks.io pings), crontab (the schedule)
+              health.py (healthchecks.io pings), backup.py (dump retention), crontab (the schedule)
 web/          Flask + HTMX app: routes/, queries.py (read SQL), templates/, static/ (phases 6-7)
 docker/       Dockerfiles for the web and worker images
 tests/        pytest suite
