@@ -1,0 +1,25 @@
+<tr id="tag-{{ tag.id }}">
+  <td><strong>{{ tag.name }}</strong></td>
+  <td>{{ tag.articles }}</td>
+  <td>
+    <form class="inline" hx-patch="/tags/{{ tag.id }}" hx-target="#tag-{{ tag.id }}" hx-swap="outerHTML">
+      <input name="weight" type="number" step="0.1" value="{{ tag.weight }}" aria-label="Weight for {{ tag.name }}">
+      <label class="check"><input type="checkbox" name="llm_assignable" {% if tag.llm_assignable %}checked{% endif %}> LLM</label>
+      <button type="submit">Save</button>
+    </form>
+  </td>
+  <td>
+    <ul class="rules" id="rules-{{ tag.id }}">
+      {% for rule in rules %}{% include "partials/rule_row.html" %}{% endfor %}
+    </ul>
+    <form class="inline" hx-post="/tags/{{ tag.id }}/rules" hx-target="#rules-{{ tag.id }}" hx-swap="beforeend">
+      <input name="query" placeholder="Finnish keywords" aria-label="Keyword rule for {{ tag.name }}"
+             hx-get="/rules/preview" hx-trigger="input changed delay:400ms" hx-target="#preview-{{ tag.id }}">
+      <button type="submit">Add rule</button>
+      <span id="preview-{{ tag.id }}" class="preview"></span>
+    </form>
+  </td>
+  <td>
+    <button type="button" class="danger" hx-delete="/tags/{{ tag.id }}" hx-target="#tag-{{ tag.id }}" hx-swap="outerHTML" hx-confirm="Delete the tag {{ tag.name }}? Its article tags are removed too.">Delete</button>
+  </td>
+</tr>

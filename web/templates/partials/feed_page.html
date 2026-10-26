@@ -1,0 +1,2 @@
+{% for c in cards %}{% include "partials/cluster_card.html" %}{% else %}<p class="muted">No stories in this view yet.</p>{% endfor %}
+{% if next_url %}<div class="more" hx-get="{{ next_url }}" hx-trigger="revealed" hx-swap="outerHTML">Loading more…</div>{% endif %}

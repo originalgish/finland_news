@@ -1,0 +1,12 @@
+<article class="card" id="cluster-{{ c.id }}">
+  <h2 class="headline"><a href="/clusters/{{ c.id }}">{% if g.lang == 'en' %}{{ c.headline or c.lead_title_en or c.lead_title }}{% else %}{{ c.lead_title or c.headline }}{% endif %}</a></h2>
+  <p class="meta">
+    <span class="badge">{{ c.source_count }} {{ 'source' if c.source_count == 1 else 'sources' }}</span>
+    <span>{{ c.article_count }} {{ 'article' if c.article_count == 1 else 'articles' }}</span>
+    <time>{{ c.last_updated|time_ago }}</time>
+  </p>
+  <p class="outlets">{% for name in c.sources %}<span class="outlet" title="{{ name }}">{{ name|initials }}</span>{% endfor %}</p>
+  <p class="tags">{% for t in c.tags %}<span class="tag">{{ t }}</span>{% endfor %}</p>
+  <button type="button" class="expand" hx-get="/clusters/{{ c.id }}" hx-target="#body-{{ c.id }}" hx-swap="innerHTML">Show articles</button>
+  <div id="body-{{ c.id }}" class="body"></div>
+</article>

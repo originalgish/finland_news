@@ -1,0 +1,21 @@
+<div class="cluster-body">
+{% for group in groups %}
+  <section class="group">
+    <h3>{{ group.source_name }}</h3>
+    {% for a in group.articles %}
+    <article class="article" id="article-{{ a.id }}">
+      <p class="title-fi">{{ a.title }}</p>
+      {% if a.title_en %}<p class="title-en">{{ a.title_en }}</p>{% endif %}
+      {% if a.summary or a.summary_en %}<p class="summary">{{ display(a.summary_en, a.summary) }}</p>{% endif %}
+      <p class="meta">
+        <time>{{ a.published_at|time_ago }}</time>
+        {% if a.url.startswith('https://') or a.url.startswith('http://') %}· <a href="{{ a.url }}" rel="noopener noreferrer">Original</a>{% endif %}
+      </p>
+      {% with tags=a.tags, article_id=a.id %}{% include "partials/article_tags.html" %}{% endwith %}
+    </article>
+    {% endfor %}
+  </section>
+{% else %}
+  <p class="muted">This story has no articles.</p>
+{% endfor %}
+</div>

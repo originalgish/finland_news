@@ -1,5 +1,6 @@
 # Dev shortcuts. Run `make install` once to create .venv for lint and tests.
-# `make up` starts only the database: web and worker need phases 6 and 8 before they can run.
+# `make up` starts the database and the web app (http://localhost:5000). The worker is started
+# with `make run-worker STAGE=...` and needs no long-running container yet.
 
 COMPOSE ?= docker compose
 PY ?= .venv/bin/python
@@ -11,7 +12,7 @@ install:
 	uv pip install --python $(PY) -e ".[dev]"
 
 up:
-	$(COMPOSE) up -d --build db
+	$(COMPOSE) up -d --build db web
 
 down:
 	$(COMPOSE) down

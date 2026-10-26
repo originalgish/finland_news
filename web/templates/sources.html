@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Sources · Finland Today{% endblock %}
+{% block content %}
+<h1>Sources</h1>
+<p class="muted">A source is disabled automatically after five failed fetches in a row. Turning it back on clears the count.</p>
+<div class="table-wrap">
+<table class="sources">
+  <thead><tr><th>Outlet</th><th>Last fetch</th><th>Status</th><th>Failures</th><th>Items a day</th><th>Enabled</th></tr></thead>
+  <tbody>
+    {% for row in rows %}{% with source=row.source, log=row.log %}{% include "partials/source_row.html" %}{% endwith %}{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

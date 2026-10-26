@@ -1,0 +1,21 @@
+<tr id="source-{{ source.id }}" class="{{ 'off' if not source.enabled }}">
+  <td>
+    <strong>{{ source.name }}</strong>
+    <details><summary>Recent fetches</summary>
+      <ul class="log">
+        {% for l in log %}
+        <li>{{ l.started_at|time_ago }}: {{ l.outcome }}{% if l.status_code %} ({{ l.status_code }}){% endif %}, {{ l.items_found }} items, {{ l.items_new }} new{% if l.error %} · {{ l.error }}{% endif %}</li>
+        {% else %}
+        <li class="muted">No fetches yet</li>
+        {% endfor %}
+      </ul>
+    </details>
+  </td>
+  <td>{{ source.last_fetched_at|time_ago or 'never' }}</td>
+  <td>{{ source.last_status or '–' }}{% if source.disabled_reason %}<br><span class="muted">{{ source.disabled_reason }}</span>{% endif %}</td>
+  <td>{{ source.consecutive_failures }}</td>
+  <td>{{ '%.1f'|format(source.items_per_day) }}</td>
+  <td>
+    <button type="button" hx-post="/sources/{{ source.id }}/toggle" hx-target="#source-{{ source.id }}" hx-swap="outerHTML" aria-pressed="{{ 'true' if source.enabled else 'false' }}">{{ 'On' if source.enabled else 'Off' }}</button>
+  </td>
+</tr>

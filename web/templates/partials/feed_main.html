@@ -1,0 +1,9 @@
+<nav class="tabs" aria-label="Views">
+  <a href="/?view=all" hx-get="/?view=all" hx-target="#main" hx-push-url="true" class="{{ 'on' if view is none }}">All</a>
+  {% for v in views %}
+  <a href="/?view={{ v.id }}" hx-get="/?view={{ v.id }}" hx-target="#main" hx-push-url="true" class="{{ 'on' if view and view.id == v.id }}">{{ v.name }}</a>
+  {% endfor %}
+</nav>
+<section class="feed" id="feed">
+  {% include "partials/feed_page.html" %}
+</section>

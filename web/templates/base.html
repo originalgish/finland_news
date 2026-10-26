@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="{{ g.lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Finland Today{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <script src="{{ url_for('static', filename='htmx.min.js') }}" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Finland Today</a>
+    <nav class="nav" aria-label="Main">
+      <a href="/tags">Tags</a>
+      <a href="/views">Views</a>
+      <a href="/sources">Sources</a>
+    </nav>
+    {% block search %}
+    <form class="search" action="/search" method="get" role="search">
+      <input type="search" name="q" placeholder="Search" aria-label="Search" value="{{ request.args.get('q', '') }}">
+    </form>
+    {% endblock %}
+    <nav class="lang" aria-label="Language">
+      <a href="/lang/en?next={{ request.full_path|urlencode }}" class="{{ 'on' if g.lang == 'en' }}">EN</a>
+      <a href="/lang/fi?next={{ request.full_path|urlencode }}" class="{{ 'on' if g.lang == 'fi' }}">FI</a>
+    </nav>
+  </header>
+  <p id="notice" class="notice" aria-live="polite"></p>
+  <main id="main">{% block content %}{% endblock %}</main>
+</body>
+</html>

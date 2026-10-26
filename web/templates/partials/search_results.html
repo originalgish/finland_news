@@ -1,0 +1,14 @@
+{% if not searched %}
+  <p class="muted">Type a word to search the Finnish and English text.</p>
+{% elif not results %}
+  <p class="muted">Nothing matches “{{ query }}”.</p>
+{% else %}
+  <ul class="results">
+    {% for r in results %}
+    <li class="result">
+      {% if r.cluster_id %}<a href="/clusters/{{ r.cluster_id }}">{{ display(r.title_en, r.title) }}</a>{% else %}<a href="{{ r.url }}" rel="noopener noreferrer">{{ display(r.title_en, r.title) }}</a>{% endif %}
+      <p class="meta">{{ r.source_name }} · {{ r.published_at|time_ago }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+{% endif %}

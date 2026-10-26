@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Views · Finland Today{% endblock %}
+{% block content %}
+<h1>Views</h1>
+<p class="muted">A view lists the stories with at least one article from the chosen outlets and tags. Leave a list empty to match everything. The default view opens first.</p>
+<form class="view-form panel" hx-post="/views" hx-target="#view-list" hx-swap="beforeend">
+  {% include "partials/view_fields.html" %}
+  <button type="submit">Create view</button>
+</form>
+<ul id="view-list" class="view-list">
+  {% for view in views %}{% include "partials/view_row.html" %}{% endfor %}
+</ul>
+{% endblock %}

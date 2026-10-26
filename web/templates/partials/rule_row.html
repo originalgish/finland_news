@@ -1,0 +1,4 @@
+<li id="rule-{{ rule.id }}">
+  <code>{{ rule.query }}</code>
+  <button type="button" class="remove" hx-delete="/rules/{{ rule.id }}" hx-target="#rule-{{ rule.id }}" hx-swap="outerHTML" aria-label="Remove rule {{ rule.query }}">×</button>
+</li>

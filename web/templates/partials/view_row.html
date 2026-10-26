@@ -1,0 +1,7 @@
+<li id="view-{{ view.id }}" class="view-row panel">
+  <form hx-patch="/views/{{ view.id }}" hx-target="#view-{{ view.id }}" hx-swap="outerHTML" class="view-form">
+    {% include "partials/view_fields.html" %}
+    <button type="submit">Save</button>
+    <button type="button" class="danger" hx-delete="/views/{{ view.id }}" hx-target="#view-{{ view.id }}" hx-swap="outerHTML" hx-confirm="Delete the view {{ view.name }}?">Delete</button>
+  </form>
+</li>

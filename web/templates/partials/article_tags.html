@@ -1,0 +1,18 @@
+<div id="tags-{{ article_id }}" class="article-tags">
+  <ul class="chips">
+    {% for t in tags %}
+    <li class="chip origin-{{ t.origin }}">
+      {{ t.name }}<span class="origin">{{ t.origin }}</span>
+      <button type="button" class="remove" hx-delete="/articles/{{ article_id }}/tags/{{ t.tag_id }}" hx-target="#tags-{{ article_id }}" hx-swap="outerHTML" aria-label="Remove {{ t.name }}">×</button>
+    </li>
+    {% else %}
+    <li class="muted">No tags yet</li>
+    {% endfor %}
+  </ul>
+  <form class="add-tag" hx-post="/articles/{{ article_id }}/tags" hx-target="#tags-{{ article_id }}" hx-swap="outerHTML">
+    <select name="tag_id" aria-label="Tag to add">
+      {% for o in tag_options %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}
+    </select>
+    <button type="submit">Add tag</button>
+  </form>
+</div>

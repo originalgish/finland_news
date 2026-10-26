@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ cluster.headline or 'Story' }} · Finland Today{% endblock %}
+{% block content %}
+<p><a href="/">← Back to the feed</a></p>
+<h1>{{ cluster.headline or 'Story' }}</h1>
+<p class="meta">{{ cluster.article_count }} articles from {{ cluster.source_count }} sources · updated {{ cluster.last_updated|time_ago }}</p>
+{% include "partials/cluster_body.html" %}
+{% endblock %}

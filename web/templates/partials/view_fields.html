@@ -1,0 +1,16 @@
+{% set v = view if view is defined else none %}
+<label>Name <input name="name" value="{{ v.name if v else '' }}" required></label>
+<fieldset>
+  <legend>Outlets</legend>
+  {% for s in source_options %}
+  <label class="check"><input type="checkbox" name="include_sources" value="{{ s.id }}" {% if v and s.id in v.include_sources %}checked{% endif %}> {{ s.name }}</label>
+  {% endfor %}
+</fieldset>
+<fieldset>
+  <legend>Tags</legend>
+  {% for t in tag_options %}
+  <label class="check"><input type="checkbox" name="include_tags" value="{{ t.id }}" {% if v and t.id in v.include_tags %}checked{% endif %}> {{ t.name }}</label>
+  {% endfor %}
+</fieldset>
+<label class="check"><input type="checkbox" name="is_default" {% if v and v.is_default %}checked{% endif %}> Default view</label>
+<label>Position <input name="position" type="number" value="{{ v.position if v else 0 }}"></label>
