@@ -8,10 +8,12 @@ import httpx
 PING_TIMEOUT_SECONDS = 10
 
 
-def ping(url: str | None) -> None:
+def ping(url: str | None, *, failed: bool = False) -> None:
+    """Report success to the check at url, or failure when failed is True (the /fail signal)."""
     if not url:
         return
+    target = f"{url.rstrip('/')}/fail" if failed else url
     try:
-        httpx.get(url, timeout=PING_TIMEOUT_SECONDS)
+        httpx.get(target, timeout=PING_TIMEOUT_SECONDS)
     except httpx.HTTPError as error:
         print(f"healthcheck ping failed: {type(error).__name__}")

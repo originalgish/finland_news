@@ -1,6 +1,6 @@
 # Dev shortcuts. Run `make install` once to create .venv for lint and tests.
-# `make up` starts the database and the web app (http://localhost:5000). The worker is started
-# with `make run-worker STAGE=...` and needs no long-running container yet.
+# `make up` starts the database and the web app (http://localhost:5000). Run a worker stage by
+# hand with `make run-worker STAGE=...`. On the server the worker container runs worker/crontab.
 
 COMPOSE ?= docker compose
 PY ?= .venv/bin/python

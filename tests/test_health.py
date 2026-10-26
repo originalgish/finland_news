@@ -12,6 +12,15 @@ def test_no_url_means_no_request(monkeypatch):
     assert calls == []
 
 
+def test_the_fail_signal_goes_to_the_fail_url(monkeypatch):
+    calls = []
+    monkeypatch.setattr(health.httpx, "get", lambda url, **kwargs: calls.append(url))
+
+    health.ping("https://hc.example/abc/", failed=True)
+
+    assert calls == ["https://hc.example/abc/fail"]
+
+
 def test_a_failed_ping_is_printed_without_the_url(monkeypatch, capsys):
     def fail(url, **kwargs):
         raise httpx.ConnectError("refused")

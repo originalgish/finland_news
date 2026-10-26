@@ -15,7 +15,8 @@ The full design and build order are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_P
 - [x] Phase 5: enrichment and tags (`make run-worker STAGE=tag`, `make run-worker STAGE=enrich`). The first live run translated all articles and wrote all cluster headlines. Tags carry definitions in the prompt, and every article now gets at least one tag and an English summary wherever the Finnish one has a summary. Crime tags fell from 29 to 21, but two accidents are still tagged crime.
 - [x] Phase 6: web app. The feed with saved views, cluster pages, tag and keyword-rule management, source health, and search. Writes are HTMX requests, so a plain cross-site form post is refused.
 - [x] Phase 7: daily digest (`make run-worker STAGE=digest`). Each run scores the stories updated in the last 24 hours by outlet count, recency and tag weight, and Claude writes a headline and blurb for the top eight. The page is stored under today's date (Helsinki time) and served at `/digest` and `/digest/<date>`, with an RSS feed of the last 14 days at `/digest.xml`. A second run on the same day replaces the first.
-- [ ] Phase 8 onward: see the plan
+- [x] Phase 8: scheduling. `python -m worker run` chains fetch, tag, embed, cluster and enrich under one advisory lock, so two runs never overlap. The worker image runs supercronic on [worker/crontab](worker/crontab): the run at 06:00 and 17:00, the digest at 06:30, and maintenance at 03:15 (Helsinki time). Maintenance deletes `fetch_log` rows older than 90 days and runs `VACUUM ANALYZE`. A run stops at the first stage that fails. The fetch check gets a success ping only when the run finished and at least 60% of sources were fetched; otherwise it gets `/fail`.
+- [ ] Phase 9 onward: see the plan
 
 Open the app at `http://localhost:5000`, or `http://localhost:8080` when `WEB_HOST_PORT` is set to 8080. The feed, tags, views, sources and search all update in place with HTMX, so switching a view or adding a tag does not reload the page.
 
@@ -37,7 +38,7 @@ make migrate                # applies migrations/*.sql
 make psql                   # open a psql shell on the dev database
 ```
 
-`make up` starts the database and the web app. The worker runs one stage at a time with `make run-worker STAGE=...`, so it has no long-running container yet.
+`make up` starts the database and the web app. On the server, the worker container runs the schedule in [worker/crontab](worker/crontab). Locally, run a stage by hand with `make run-worker STAGE=...`. `make up` does not start the worker, so the schedule stays off on your machine unless you start that container yourself.
 
 ## Commands
 
@@ -56,6 +57,8 @@ make psql                   # open a psql shell on the dev database
 | `make run-worker STAGE=tag` | Add tags from feed categories and keyword rules to new articles (phase 5, no LLM) |
 | `make run-worker STAGE=enrich` | Translate and tag new articles, and write cluster headlines with Claude (phase 5). Needs `ANTHROPIC_API_KEY` |
 | `make run-worker STAGE=digest` | Write today's digest with Claude's headlines and blurbs (phase 7). Needs `ANTHROPIC_API_KEY` |
+| `make run-worker STAGE=run` | Run the whole pipeline once: fetch, tag, embed, cluster, enrich (phase 8). Pings the fetch check (see Configuration to avoid that) |
+| `make run-worker STAGE=maintenance` | Delete `fetch_log` rows older than 90 days, then `VACUUM ANALYZE` (phase 8) |
 
 The migration database test is skipped unless `TEST_DATABASE_URL` is set. It creates and drops its own database, so the role needs `CREATEDB`. Use the port from `DB_HOST_PORT`:
 
@@ -75,14 +78,18 @@ Settings come from `.env`. [.env.example](.env.example) lists them all.
 - `ANTHROPIC_API_KEY` enables the LLM steps: enrich, and the same-event check in cluster. Keep the key in `.env`, which is never committed.
 - `LLM_MODEL` picks the Claude model. The default is `claude-haiku-5-5`.
 - `LLM_MAX_ARTICLES_PER_RUN` caps how many articles one enrich run sends to the model (default 500). Unfinished articles are picked up by the next run.
-- `HC_DIGEST_URL` is a healthchecks.io ping, sent only after a digest is stored, so a failed run lets the alert fire. Leave it unset locally.
+- `HC_FETCH_URL` is the healthchecks.io check for the scheduled run. It gets a success ping, or `/fail` when the run stops or too few sources were fetched.
+- `HC_DIGEST_URL` is a healthchecks.io ping, sent only after a digest is stored, so a failed run lets the alert fire.
+- Both `HC_` URLs are read from `.env`, so a local run sends pings too. For a test run that sends none, empty the URL in the container: `docker compose run --rm -e HC_FETCH_URL= -e HC_DIGEST_URL= worker python -m worker run`.
 
 ## Layout
 
 ```
 app/          shared config and the migration runner (python -m app.migrate)
 migrations/   numbered SQL files, applied in order
-worker/       fetch, normalize, dedupe, embed, cluster, tagging, enrich (phases 1-5); digest (phase 7); health pings
+worker/       fetch, normalize, dedupe, embed, cluster, tagging, enrich (phases 1-5); digest (phase 7);
+              stages.py (one function per stage), pipeline.py (run, phase 8), maintenance.py,
+              health.py (healthchecks.io pings), crontab (the schedule)
 web/          Flask + HTMX app: routes/, queries.py (read SQL), templates/, static/ (phases 6-7)
 docker/       Dockerfiles for the web and worker images
 tests/        pytest suite

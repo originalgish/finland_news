@@ -1,0 +1,4 @@
+# Times are Helsinki time. The worker container sets TZ, see docker-compose.yml.
+0 6,17 * * *    python -m worker run
+30 6 * * *      python -m worker digest
+15 3 * * *      python -m worker maintenance   # prune fetch_log older than 90 days, VACUUM ANALYZE

@@ -21,6 +21,7 @@ class Settings:
     anthropic_api_key: str | None
     llm_model: str
     llm_max_articles_per_run: int
+    healthcheck_fetch_url: str | None = None
     healthcheck_digest_url: str | None = None
 
 
@@ -41,5 +42,6 @@ def get_settings() -> Settings:
         llm_max_articles_per_run=int(
             os.environ.get("LLM_MAX_ARTICLES_PER_RUN", DEFAULT_LLM_MAX_ARTICLES)
         ),
+        healthcheck_fetch_url=os.environ.get("HC_FETCH_URL") or None,
         healthcheck_digest_url=os.environ.get("HC_DIGEST_URL") or None,
     )
