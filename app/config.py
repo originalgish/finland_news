@@ -31,7 +31,7 @@ def get_settings() -> Settings:
         raise RuntimeError("DATABASE_URL is not set")
     return Settings(
         database_url=database_url,
-        user_agent=os.environ.get("USER_AGENT", "FinlandToday/0.1"),
+        user_agent=os.environ.get("USER_AGENT", "FinlandNews/0.1"),
         embed_model=os.environ.get("EMBED_MODEL", DEFAULT_EMBED_MODEL),
         embed_dim=int(os.environ.get("EMBED_DIM", DEFAULT_EMBED_DIM)),
         embed_cache_dir=os.environ.get("EMBED_CACHE_DIR") or None,
