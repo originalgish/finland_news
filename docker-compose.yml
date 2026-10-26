@@ -32,6 +32,12 @@ services:
     image: caddy:2
     profiles: [prod]
     ports: ["80:80", "443:443"]
+    # Defaults are blank so that `make up` works without these set. Caddy refuses to start
+    # with a blank value, which is the check that matters on the server.
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-}
+      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

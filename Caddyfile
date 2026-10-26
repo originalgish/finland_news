@@ -1,6 +1,8 @@
-news.example.com {
+# Production only. The compose file passes SITE_DOMAIN, BASIC_AUTH_USER and BASIC_AUTH_HASH
+# in from .env on the server. See DEPLOY.md.
+{$SITE_DOMAIN} {
     basic_auth {
-        denis <bcrypt hash from `caddy hash-password`>
+        {$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
     }
     encode zstd gzip
     reverse_proxy web:8000

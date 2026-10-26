@@ -16,7 +16,8 @@ The full design and build order are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_P
 - [x] Phase 6: web app. The feed with saved views, cluster pages, tag and keyword-rule management, source health, and search. Writes are HTMX requests, so a plain cross-site form post is refused.
 - [x] Phase 7: daily digest (`make run-worker STAGE=digest`). Each run scores the stories updated in the last 24 hours by outlet count, recency and tag weight, and Claude writes a headline and blurb for the top eight. The page is stored under today's date (Helsinki time) and served at `/digest` and `/digest/<date>`, with an RSS feed of the last 14 days at `/digest.xml`. A second run on the same day replaces the first.
 - [x] Phase 8: scheduling. `python -m worker run` chains fetch, tag, embed, cluster and enrich under one advisory lock, so two runs never overlap. The worker image runs supercronic on [worker/crontab](worker/crontab): the run at 06:00 and 17:00, the digest at 06:30, and maintenance at 03:15 (Helsinki time). Maintenance deletes `fetch_log` rows older than 90 days and runs `VACUUM ANALYZE`. A run stops at the first stage that fails. The fetch check gets a success ping only when the run finished and at least 60% of sources were fetched; otherwise it gets `/fail`.
-- [ ] Phase 9 onward: see the plan
+- [ ] Phase 9: deployment. `DEPLOY.md` has the server checklist, and `scripts/deploy.sh` pulls, builds, migrates and starts. Caddy serves HTTPS on `SITE_DOMAIN` behind basic auth, and only Caddy publishes ports. I tested that stack locally with a throwaway project, but it is not running on a server yet.
+- [ ] Phase 10 onward: see the plan
 
 Open the app at `http://localhost:5000`, or `http://localhost:8080` when `WEB_HOST_PORT` is set to 8080. The feed, tags, views, sources and search all update in place with HTMX, so switching a view or adding a tag does not reload the page.
 
@@ -77,6 +78,7 @@ Settings come from `.env`. [.env.example](.env.example) lists them all.
 - `EMBED_CACHE_DIR` is where the model weights are stored. The worker image sets it to `/opt/models`, so containers never download the model at start. Leave it unset elsewhere.
 - `ANTHROPIC_API_KEY` enables the LLM steps: enrich, and the same-event check in cluster. Keep the key in `.env`, which is never committed.
 - `LLM_MODEL` picks the Claude model. The default is `claude-haiku-5-5`.
+- `SITE_DOMAIN`, `BASIC_AUTH_USER` and `BASIC_AUTH_HASH` are read only by Caddy on the server. `COMPOSE_FILE` and `COMPOSE_PROFILES=prod` are server settings too. [DEPLOY.md](DEPLOY.md) covers them all.
 - `LLM_MAX_ARTICLES_PER_RUN` caps how many articles one enrich run sends to the model (default 500). Unfinished articles are picked up by the next run.
 - `HC_FETCH_URL` is the healthchecks.io check for the scheduled run. It gets a success ping, or `/fail` when the run stops or too few sources were fetched.
 - `HC_DIGEST_URL` is a healthchecks.io ping, sent only after a digest is stored, so a failed run lets the alert fire.
@@ -86,6 +88,7 @@ Settings come from `.env`. [.env.example](.env.example) lists them all.
 
 ```
 app/          shared config and the migration runner (python -m app.migrate)
+scripts/      deploy.sh, the server deploy (see DEPLOY.md)
 migrations/   numbered SQL files, applied in order
 worker/       fetch, normalize, dedupe, embed, cluster, tagging, enrich (phases 1-5); digest (phase 7);
               stages.py (one function per stage), pipeline.py (run, phase 8), maintenance.py,
