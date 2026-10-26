@@ -1,0 +1,13 @@
+{% for item in items %}
+<article class="digest-item">
+  <h2>{{ item.headline }}</h2>
+  <p>{{ item.blurb }}</p>
+  {% if item.links %}
+  <ul class="digest-links">
+    {% for link in item.links %}<li><a href="{{ link.url }}" rel="noopener noreferrer">{{ link.source }}: {{ link.title }}</a></li>{% endfor %}
+  </ul>
+  {% endif %}
+</article>
+{% else %}
+<p class="muted">Nothing new in the last 24 hours.</p>
+{% endfor %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Digest · Finland Today{% endblock %}
+{% block content %}
+<h1>Daily digest</h1>
+{% if digest %}
+<p class="meta"><time>{{ digest.date.isoformat() }}</time> · written {{ digest.created_at|time_ago }}</p>
+{{ digest.html|safe }}
+{% else %}
+<p class="muted">No digest yet. The worker writes one each morning.</p>
+{% endif %}
+{% if days %}
+<nav class="digest-days" aria-label="Digests by day">
+  {% for day in days %}<a href="{{ url_for('digest.on_day', day=day.isoformat()) }}" class="{{ 'on' if digest and digest.date == day }}">{{ day.isoformat() }}</a>{% endfor %}
+</nav>
+{% endif %}
+{% endblock %}

@@ -8,9 +8,11 @@ import psycopg
 
 from app.config import Settings, get_settings
 from worker.cluster import run_cluster
+from worker.digest import run_digest
 from worker.embed import run_embed
 from worker.enrich import make_same_event_judge, run_enrich
 from worker.fetch import FetchOptions, run_fetch
+from worker.health import ping
 from worker.llm import Claude
 from worker.tagging import apply_tags
 
@@ -77,12 +79,29 @@ def enrich_stage(conn: psycopg.Connection, settings: Settings) -> int:
     return 0
 
 
+def digest_stage(conn: psycopg.Connection, settings: Settings) -> int:
+    if not settings.anthropic_api_key:
+        print("digest needs ANTHROPIC_API_KEY in .env")
+        return 1
+    llm = Claude.from_api_key(settings.anthropic_api_key, settings.llm_model)
+    summary = run_digest(conn, llm)
+    print(
+        f"digest for {summary.day}: {summary.stories} stories from {summary.candidates} "
+        f"clusters updated in the last 24 hours; {summary.missing} left out for lack of an answer"
+    )
+    print(f"llm usage: {llm.usage.summary()}")
+    # Pinged only after the digest is stored, so a failed run triggers the healthchecks alert.
+    ping(settings.healthcheck_digest_url)
+    return 0
+
+
 STAGES: dict[str, Callable[[psycopg.Connection, Settings], int]] = {
     "fetch": fetch_stage,
     "embed": embed_stage,
     "cluster": cluster_stage,
     "tag": tag_stage,
     "enrich": enrich_stage,
+    "digest": digest_stage,
 }
 
 

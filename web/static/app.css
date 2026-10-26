@@ -231,3 +231,10 @@ form.inline, .tag-form, .view-form { display: flex; flex-wrap: wrap; gap: 0.5rem
   .search { flex: 0 1 18rem; margin-left: auto; }
   .lang { margin-left: 0.5rem; }
 }
+
+/* Daily digest */
+.digest-item { border-left: 3px solid var(--line); padding: 0.25rem 0 0.25rem 0.75rem; margin: 0 0 1rem; }
+.digest-item h2 { font-size: 1.1rem; margin: 0.25rem 0; }
+.digest-links { margin: 0.35rem 0 0; padding-left: 1.1rem; font-size: 0.9rem; }
+.digest-days { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.5rem; font-size: 0.9rem; }
+.digest-days a.on { font-weight: 700; }

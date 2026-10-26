@@ -1,6 +1,6 @@
 """Read-side SQL for the web app. Writes live in the route modules."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 import psycopg
@@ -141,6 +141,18 @@ WHERE published_at > now() - interval '7 days'
   AND search_tsv @@ websearch_to_tsquery('finnish', %s)
 """
 
+DIGEST_ON_SQL = "SELECT date, html, items, created_at FROM digests WHERE date = %s"
+
+LATEST_DIGEST_SQL = """
+SELECT date, html, items, created_at FROM digests ORDER BY date DESC LIMIT 1
+"""
+
+RECENT_DIGESTS_SQL = """
+SELECT date, html, items, created_at FROM digests ORDER BY date DESC LIMIT %s
+"""
+
+DIGEST_DATES_SQL = "SELECT date FROM digests ORDER BY date DESC LIMIT 30"
+
 
 def feed_page(
     conn: psycopg.Connection,
@@ -275,3 +287,18 @@ def _with_members(conn: psycopg.Connection, rows: list[dict[str, Any]]) -> list[
     for row in conn.execute(ADMIN_MEMBERS_SQL, ([r["id"] for r in rows],)).fetchall():
         members.setdefault(row["cluster_id"], []).append(row)
     return [{**row, "members": members.get(row["id"], [])} for row in rows]
+
+
+def digest(conn: psycopg.Connection, day: date | None = None) -> dict[str, Any] | None:
+    """The stored digest for one day, or the latest one when no day is given."""
+    if day is None:
+        return conn.execute(LATEST_DIGEST_SQL).fetchone()
+    return conn.execute(DIGEST_ON_SQL, (day,)).fetchone()
+
+
+def recent_digests(conn: psycopg.Connection, limit: int) -> list[dict[str, Any]]:
+    return conn.execute(RECENT_DIGESTS_SQL, (limit,)).fetchall()
+
+
+def digest_dates(conn: psycopg.Connection) -> list[date]:
+    return [row["date"] for row in conn.execute(DIGEST_DATES_SQL).fetchall()]
