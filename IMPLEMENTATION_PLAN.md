@@ -1,4 +1,4 @@
-# Finland Today — Implementation Plan
+# Finland News — Implementation Plan
 
 A self-hosted, single-user Finnish news aggregator: pull RSS from Finnish outlets, dedupe and cluster stories, translate and tag them with an LLM, browse them through saved views, and read a daily digest.
 
@@ -38,7 +38,7 @@ This plan reflects the decisions made so far:
 ## 1. Repository layout
 
 ```
-finland-today/
+finland-news/
 ├── docker-compose.yml
 ├── docker-compose.override.yml      # local dev: ports, bind mounts, no Caddy
 ├── Caddyfile
@@ -274,7 +274,7 @@ Seed Yle, HS, IS, Iltalehti and Kauppalehti. **Verify each feed URL in a browser
    HC_FETCH_URL=            # healthchecks.io ping URLs
    HC_DIGEST_URL=
    TZ=Europe/Helsinki
-   USER_AGENT=FinlandToday/0.1 (+https://your-domain/about)
+   USER_AGENT=FinlandNews/0.1 (+https://your-domain/about)
    ```
 3. `docker-compose.yml` with `db`, `worker`, `web`, `caddy` (see §11). `docker-compose.override.yml` for local dev exposes `db:5432` and `web:5000`, bind-mounts the code, skips Caddy.
 4. `app/migrate.py`: read `migrations/*.sql` in order, skip versions already in `schema_migrations`, apply each in a transaction.

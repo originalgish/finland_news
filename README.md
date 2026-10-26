@@ -1,4 +1,4 @@
-# Finland Today
+# Finland News
 
 A self-hosted, single-user Finnish news aggregator. It pulls RSS feeds from Finnish outlets, removes duplicates, groups stories about the same event, translates and tags them with an LLM, and lets you read them through saved views and a daily digest.
 
