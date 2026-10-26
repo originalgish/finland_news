@@ -8,9 +8,11 @@ Run these steps once, in order. After that, deploys are a single command.
 
 1. Create a CX22-class server (2 vCPU, 4 GB) with Ubuntu LTS and add your SSH key.
 2. Create a non-root user with sudo. Disable password logins and root SSH logins in `/etc/ssh/sshd_config`, then reload SSH.
-3. In the Hetzner Cloud console, add a firewall that allows TCP 22 (optionally only from your IP), 80 and 443. Nothing else.
+3. In the Hetzner Cloud console, add a firewall that allows TCP 22, 80 and 443. Nothing else. Leave 22 open to all addresses if you use the GitHub Actions deploy (section 6), because the runners' addresses change. Key-only SSH is the protection.
 4. Install Docker Engine and the compose plugin from Docker's apt repository. Turn on `unattended-upgrades`.
 5. Point an A record (and AAAA if you use IPv6) for your domain at the server. Caddy needs the record in place before its first start, so it can get a certificate.
+
+   Without a domain of your own, use a free DuckDNS subdomain. Sign in at duckdns.org, claim a name such as `finnews`, and set it to the server's IPv4. The server's address is static, so you set it once. `finnews.duckdns.org` is then the `SITE_DOMAIN`, and Caddy gets a normal certificate for it. To move to a real domain later, point its record at the server, change `SITE_DOMAIN`, and deploy again.
 
 ## 2. Code and secrets
 
@@ -47,6 +49,8 @@ The script checks that the required values are in `.env`, pulls `main`, builds t
 Then check the site from a browser. It should ask for the basic-auth login, then show the feed. The first certificate takes a minute.
 
 ## 4. Deploys after that
+
+Each push to `main` deploys by itself once section 6 is set up. To deploy by hand on the server:
 
 ```bash
 scripts/deploy.sh
@@ -100,3 +104,43 @@ The backup runs from the server's crontab, not from the worker, because the dump
 6. Turn on weekly server snapshots in the Hetzner console (the backups add-on, or manual snapshots). They are not automated here.
 
 Run `scripts/restore-check.sh` again after any schema change. It restores into a scratch database called `ft_restore_check`, then drops that database.
+
+## 6. Continuous deployment
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs lint and the tests on every push and pull request, against a pgvector Postgres. [.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs the same checks on each push to `main`, then connects to the server over SSH and runs `scripts/deploy.sh`. A failed `/healthz` check fails the workflow. To deploy again without a push, run the Deploy workflow from the Actions tab.
+
+Do the first deploy by hand (section 3) before you set this up.
+
+1. On your laptop, create a key that is used only by GitHub:
+
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/finland_news_ci -N "" -C github-actions
+   ```
+
+2. On the server, add the public key to `~/.ssh/authorized_keys` of the deploy user, with a forced command in front of it:
+
+   ```
+   restrict,command="cd ~/finland_news && scripts/deploy.sh" ssh-ed25519 AAAA... github-actions
+   ```
+
+   Whatever command the client asks for, this key only runs the deploy. `restrict` turns off the shell, port forwarding and agent forwarding.
+
+3. Get the server's host key, so the workflow can check it:
+
+   ```bash
+   ssh-keyscan -t ed25519 <server-ip>
+   ```
+
+4. In GitHub, open Settings → Environments, create an environment called `production`, and add these secrets:
+   - `SSH_HOST`: the server's IP address.
+   - `SSH_USER`: the deploy user.
+   - `SSH_PRIVATE_KEY`: the contents of `~/.ssh/finland_news_ci`.
+   - `SSH_KNOWN_HOSTS`: the `ssh-keyscan` output.
+
+   To approve each deploy by hand, add yourself as a required reviewer on the environment.
+
+5. Check that the key cannot do anything else. This should run a deploy, not `ls`:
+
+   ```bash
+   ssh -i ~/.ssh/finland_news_ci <user>@<server-ip> ls
+   ```
