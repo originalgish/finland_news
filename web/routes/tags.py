@@ -15,7 +15,9 @@ def _oob_notice(message: str) -> str:
 
 
 def _tag_row(tag_id: int) -> dict:
-    row = next(t for t in queries.tags(g.db) if t["id"] == tag_id)
+    row = next((t for t in queries.tags(g.db) if t["id"] == tag_id), None)
+    if row is None:
+        abort(404)
     return {"tag": row, "rules": queries.rules_by_tag(g.db).get(tag_id, [])}
 
 

@@ -146,3 +146,25 @@ def test_a_second_run_has_nothing_to_do(conn):
     summary = cluster_pending(conn)
 
     assert summary.articles == 0
+
+
+def test_a_story_is_dated_by_its_articles_not_by_the_run(conn):
+    add(conn, "Yle", 1, vector_with_cosine(0.95, axis=1), published=NOW - timedelta(hours=5))
+    add(conn, "Ilta-Sanomat", 2, vector_with_cosine(0.95, axis=2), published=NOW - timedelta(hours=2))
+
+    cluster_pending(conn)
+
+    first_seen, last_updated = conn.execute("SELECT first_seen, last_updated FROM clusters").fetchone()
+    assert (first_seen, last_updated) == (NOW - timedelta(hours=5), NOW - timedelta(hours=2))
+
+
+def test_a_late_older_article_does_not_move_the_story_back_in_time(conn):
+    add(conn, "Yle", 1, vector_with_cosine(0.95, axis=1), published=NOW)
+    cluster_pending(conn)
+    add(conn, "Ilta-Sanomat", 2, vector_with_cosine(0.95, axis=2), published=NOW - timedelta(hours=3))
+
+    cluster_pending(conn)
+
+    ((_, article_count, _, _),) = clusters(conn)
+    (last_updated,) = conn.execute("SELECT last_updated FROM clusters").fetchone()
+    assert (article_count, last_updated) == (2, NOW)

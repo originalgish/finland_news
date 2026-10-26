@@ -29,7 +29,9 @@ def _clear_other_defaults(keep_id: int | None) -> None:
 
 
 def _row(view_id: int) -> str:
-    view = next(v for v in queries.views(g.db) if v["id"] == view_id)
+    view = next((v for v in queries.views(g.db) if v["id"] == view_id), None)
+    if view is None:
+        abort(404)
     return render_template("partials/view_row.html", view=view, **_options())
 
 

@@ -6,6 +6,7 @@ from functools import wraps
 from typing import Any
 
 from flask import Response, abort, g, request
+from markupsafe import escape
 
 LANGS = ("en", "fi")
 
@@ -27,9 +28,12 @@ def require_htmx[F: Callable[..., Any]](view: F) -> F:
 
 
 def notice(message: str, *, ok: bool = True) -> Response:
-    """A message for the page's notice area, sent with an HTMX retarget header."""
+    """A message for the page's notice area, sent with an HTMX retarget header.
+
+    The message is escaped, because it can quote what the user typed.
+    """
     css = "notice ok" if ok else "notice error"
-    response = Response(f'<p class="{css}">{message}</p>', mimetype="text/html")
+    response = Response(f'<p class="{css}">{escape(message)}</p>', mimetype="text/html")
     response.headers["HX-Retarget"] = "#notice"
     response.headers["HX-Reswap"] = "innerHTML"
     return response

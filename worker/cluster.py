@@ -34,18 +34,28 @@ ORDER BY published_at, id
 LIMIT %s
 """
 
+# An exact search over the window. The window holds a few days of articles, so this is
+# cheap. Ordering the whole table through the HNSW index instead would filter its top
+# matches by date afterwards, and once older articles crowd the top matches the query
+# finds no neighbour at all.
 NEAREST_SQL = """
+WITH recent AS MATERIALIZED (
+    SELECT cluster_id, source_id, embedding
+    FROM articles
+    WHERE cluster_id IS NOT NULL
+      AND published_at > %(since)s
+)
 SELECT cluster_id, source_id, 1 - (embedding <=> %(embedding)s::vector) AS similarity
-FROM articles
-WHERE cluster_id IS NOT NULL
-  AND published_at > %(since)s
+FROM recent
 ORDER BY embedding <=> %(embedding)s::vector
 LIMIT 1
 """
 
+# A story is dated by its articles' publication times, not by when the worker ran, so
+# the feed order, "time ago" and the digest's recency follow the news itself.
 NEW_CLUSTER_SQL = """
 INSERT INTO clusters (first_seen, last_updated, article_count, source_count, centroid)
-VALUES (now(), now(), 1, 1, %(centroid)s::vector)
+VALUES (%(published_at)s, %(published_at)s, 1, 1, %(centroid)s::vector)
 RETURNING id
 """
 
@@ -56,7 +66,7 @@ UPDATE clusters
 SET centroid = %(centroid)s::vector,
     article_count = %(article_count)s,
     source_count = (SELECT count(DISTINCT source_id) FROM articles WHERE cluster_id = %(id)s),
-    last_updated = now(),
+    last_updated = GREATEST(last_updated, %(published_at)s),
     headline = NULL
 WHERE id = %(id)s
 """
@@ -144,19 +154,29 @@ def _cluster_one(
             decision = Decision.NEW
 
     if decision is Decision.JOIN:
-        _join(conn, article_id, candidate.cluster_id, embedding)
+        _join(conn, article_id, candidate.cluster_id, published_at, embedding)
         summary.joined += 1
     else:
-        _create(conn, article_id, embedding)
+        _create(conn, article_id, published_at, embedding)
         summary.created += 1
 
 
-def _create(conn: psycopg.Connection, article_id: int, embedding: str) -> None:
-    cluster_id = conn.execute(NEW_CLUSTER_SQL, {"centroid": embedding}).fetchone()[0]
+def _create(
+    conn: psycopg.Connection, article_id: int, published_at: datetime, embedding: str
+) -> None:
+    cluster_id = conn.execute(
+        NEW_CLUSTER_SQL, {"published_at": published_at, "centroid": embedding}
+    ).fetchone()[0]
     conn.execute(ASSIGN_SQL, {"id": article_id, "cluster_id": cluster_id})
 
 
-def _join(conn: psycopg.Connection, article_id: int, cluster_id: int, embedding: str) -> None:
+def _join(
+    conn: psycopg.Connection,
+    article_id: int,
+    cluster_id: int,
+    published_at: datetime,
+    embedding: str,
+) -> None:
     centroid_text, count = conn.execute(CLUSTER_STATE_SQL, (cluster_id,)).fetchone()
     old = np.array(centroid_text.strip("[]").split(","), dtype=np.float64)
     new = np.array(embedding.strip("[]").split(","), dtype=np.float64)
@@ -170,6 +190,7 @@ def _join(conn: psycopg.Connection, article_id: int, cluster_id: int, embedding:
             "id": cluster_id,
             "centroid": to_pgvector(centroid),
             "article_count": count + 1,
+            "published_at": published_at,
         },
     )
 

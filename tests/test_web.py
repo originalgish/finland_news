@@ -365,3 +365,20 @@ def test_a_lone_article_cannot_be_split_out(client, seeded):
 
 def test_split_needs_htmx(client, seeded):
     assert client.post(f"/admin/articles/{seeded['articles']['jaro-is']}/split").status_code == 403
+
+
+def test_a_notice_does_not_render_what_the_user_typed_as_html(client):
+    name = "<img src=x onerror=alert(1)>"
+    client.post("/views", data={"name": name}, headers=HX)
+
+    duplicate = client.post("/views", data={"name": name}, headers=HX).get_data(as_text=True)
+
+    assert "already exists" in duplicate
+    assert "<img" not in duplicate
+
+
+@pytest.mark.parametrize("path", ["/tags/999999", "/views/999999"])
+def test_editing_something_that_was_deleted_is_not_found(client, path):
+    response = client.patch(path, data={"name": "Gone", "weight": "1"}, headers=HX)
+
+    assert response.status_code == 404
