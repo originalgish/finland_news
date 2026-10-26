@@ -6,4 +6,6 @@ It pulls the RSS feeds of five Finnish outlets and removes duplicate articles. A
 
 Only titles, short summaries and links are stored, never full article text. The worker and the web app share nothing but the database. The web app has no login of its own, so it runs behind basic auth.
 
+GitHub Actions runs lint and the tests on every push. Each push to `main` that passes them deploys to the server.
+
 The design and build order are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Deployment is in [DEPLOY.md](DEPLOY.md).

@@ -1,0 +1,57 @@
+# Lint and tests on every push and pull request. deploy.yml also calls this before it deploys.
+name: CI
+
+on:
+  push:
+    branches-ignore: [main]  # deploy.yml runs CI for main
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      # Same image as docker-compose.yml, so the migrations get pgvector.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ft
+          POSTGRES_PASSWORD: ft
+          POSTGRES_DB: ft
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ft"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # tests/conftest.py creates and drops a scratch database per test from this URL.
+      TEST_DATABASE_URL: postgresql://ft:ft@localhost:5432/ft
+      # test_embed_db.py loads the real embedding model. Keep it in a cached directory.
+      FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.fastembed_cache
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+
+      - uses: actions/cache@v4
+        with:
+          path: .fastembed_cache
+          key: fastembed-${{ hashFiles('app/config.py') }}
+
+      - name: Install
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -e ".[dev]"
+
+      - name: Lint
+        run: .venv/bin/python -m ruff check .
+
+      - name: Test
+        run: .venv/bin/python -m pytest
