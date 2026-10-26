@@ -130,3 +130,28 @@ def test_a_manual_tag_is_kept_when_a_rule_would_add_it(conn):
     apply_tags(conn)
 
     assert tags_of(conn, article) == {"weather": "manual"}
+
+
+def test_a_removed_tag_is_not_added_back_on_the_next_run(conn):
+    article = add_article(conn, 1, "Maalitykset", categories=["Urheilu"])
+    apply_tags(conn)
+    conn.execute("DELETE FROM article_tags WHERE article_id = %s", (article,))
+
+    summary = apply_tags(conn)
+
+    assert summary.articles == 0
+    assert tags_of(conn, article) == {}
+
+
+def test_only_untagged_articles_are_processed(conn):
+    old = add_article(conn, 1, "Myrsky eilen")
+    apply_tags(conn)
+    # A rule added later reaches older articles through the web app's backfill, not here.
+    conn.execute("INSERT INTO tag_rules (tag_id, query) VALUES (%s, 'myrsky')", (tag_id(conn, "weather"),))
+    new = add_article(conn, 2, "Myrsky tänään")
+
+    summary = apply_tags(conn)
+
+    assert summary.articles == 1
+    assert tags_of(conn, new) == {"weather": "rule"}
+    assert tags_of(conn, old) == {}

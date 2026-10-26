@@ -1,0 +1,19 @@
+<section class="card" id="admin-cluster-{{ cluster.id }}">
+  <h2 class="headline"><a href="/clusters/{{ cluster.id }}">{{ cluster.headline or 'No headline yet' }}</a></h2>
+  <p class="meta">{{ cluster.article_count }} articles · {{ cluster.source_count }} sources · updated {{ cluster.last_updated|time_ago }}</p>
+  <div class="table-wrap">
+  <table class="members">
+    <thead><tr><th>Similarity</th><th>Outlet</th><th>Title</th><th></th></tr></thead>
+    <tbody>
+      {% for m in cluster.members %}
+      <tr>
+        <td>{{ '%.3f'|format(m.similarity) if m.similarity is not none else '–' }}</td>
+        <td>{{ m.source_name }}</td>
+        <td>{{ display(m.title_en, m.title) }}</td>
+        <td>{% if cluster.members|length > 1 %}<button type="button" hx-post="/admin/articles/{{ m.id }}/split" hx-target="#admin-cluster-{{ cluster.id }}" hx-swap="outerHTML" hx-confirm="Move this article into a story of its own?">Split out</button>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>

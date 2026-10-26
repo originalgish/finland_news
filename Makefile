@@ -30,7 +30,7 @@ test:
 lint:
 	$(PY) -m ruff check .
 
-# Needs web/static/input.css, which arrives in phase 6.
+# Not used yet: web/static/app.css is hand-written. Needs web/static/input.css once Tailwind is adopted.
 css:
 	tailwindcss -i web/static/input.css -o web/static/app.css --minify
 

@@ -330,3 +330,38 @@ def test_the_language_switch_stays_on_the_same_site(client):
 @pytest.mark.parametrize("path", ["/tags", "/views", "/sources", "/search?q=Jaro"])
 def test_management_pages_render(client, path):
     assert client.get(path).status_code == 200
+
+
+def test_admin_clusters_lists_only_stories_with_several_articles(client):
+    html = client.get("/admin/clusters").get_data(as_text=True)
+
+    assert "Jaro stays in the Veikkausliiga" in html
+    assert "Storm is coming to southern Finland" not in html
+    assert html.count(">Split out</button>") == 2
+
+
+def test_splitting_an_article_out_gives_it_its_own_cluster(client, seeded, scratch_url):
+    article = seeded["articles"]["jaro-is"]
+
+    response = client.post(f"/admin/articles/{article}/split", headers=HX)
+
+    assert response.status_code == 200
+    assert ">Split out</button>" not in response.get_data(as_text=True)
+    left = db_rows(scratch_url, "SELECT article_count, source_count, headline FROM clusters WHERE id = %s", (seeded["jaro"],))
+    assert left == [(1, 1, None)]
+    moved = db_rows(
+        scratch_url,
+        "SELECT c.article_count, c.source_count FROM articles a JOIN clusters c ON c.id = a.cluster_id WHERE a.id = %s",
+        (article,),
+    )
+    assert moved == [(1, 1)]
+
+
+def test_a_lone_article_cannot_be_split_out(client, seeded):
+    response = client.post(f"/admin/articles/{seeded['articles']['storm-yle']}/split", headers=HX)
+
+    assert "already a story of its own" in response.get_data(as_text=True)
+
+
+def test_split_needs_htmx(client, seeded):
+    assert client.post(f"/admin/articles/{seeded['articles']['jaro-is']}/split").status_code == 403

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Clusters · Finland Today{% endblock %}
+{% block content %}
+<h1>Clusters</h1>
+<p class="muted">Recent stories with more than one article. Members are listed by similarity to the cluster centre, lowest first. Split out an article that does not belong.</p>
+{% for cluster in clusters %}{% include "partials/admin_cluster.html" %}{% else %}<p class="muted">No stories with more than one article yet.</p>{% endfor %}
+{% endblock %}

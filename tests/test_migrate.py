@@ -39,7 +39,7 @@ def test_migrate_creates_schema_and_is_idempotent(scratch_conn):
     first = migrate(scratch_conn)
     second = migrate(scratch_conn)
 
-    assert first == ["001_init", "002_seed_sources"]
+    assert first == ["001_init", "002_seed_sources", "003_tagged_at"]
     assert second == []
 
     tables = {

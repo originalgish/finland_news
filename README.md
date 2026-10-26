@@ -11,7 +11,7 @@ The full design and build order are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_P
 - [x] Phase 1: fetch (`make run-worker STAGE=fetch`)
 - [x] Phase 2: normalize and exact dedupe
 - [x] Phase 3: embeddings (`make run-worker STAGE=embed`)
-- [x] Phase 4: clustering (`make run-worker STAGE=cluster`). Pairs with cosine 0.80 or more merge. Borderline pairs (0.60 to 0.80) start new clusters until the Phase 5 same-event check exists.
+- [x] Phase 4: clustering (`make run-worker STAGE=cluster`). Pairs with cosine 0.80 or more merge. Borderline pairs (0.60 to 0.80) go to Claude's same-event check, or start new clusters when no API key is set. The hidden page `/admin/clusters` lists recent multi-article stories with each member's similarity to the cluster centre, and splits a wrongly merged article out into a story of its own.
 - [x] Phase 5: enrichment and tags (`make run-worker STAGE=tag`, `make run-worker STAGE=enrich`). The first live run translated all articles and wrote all cluster headlines. Tags carry definitions in the prompt, and every article now gets at least one tag and an English summary wherever the Finnish one has a summary. Crime tags fell from 29 to 21, but two accidents are still tagged crime.
 - [x] Phase 6: web app. The feed with saved views, cluster pages, tag and keyword-rule management, source health, and search. Writes are HTMX requests, so a plain cross-site form post is refused.
 - [ ] Phase 7 onward: see the plan
@@ -22,7 +22,7 @@ The web app has no login. Put it behind Caddy basic auth or Tailscale before it 
 
 Today the fetch stage downloads the five feeds, stores new and changed articles by canonical URL, and records each attempt in `fetch_log`. The embed stage gives each article a 384-dimension vector of its title and summary, using a multilingual model baked into the worker image. The cluster stage groups articles about the same event. Its thresholds were calibrated on hand-labelled pairs in [tests/fixtures/cluster_calibration.csv](tests/fixtures/cluster_calibration.csv). Re-check them if the embedding model changes.
 
-The tag stage adds tags from feed categories and keyword rules, with no LLM. The enrich stage uses Claude (`LLM_MODEL`, default `claude-haiku-5-5`) to translate each article into English, add up to three tags from the starter list, and write one English headline per cluster. The cluster stage also asks Claude to confirm borderline pairs when a key is set. Without a key, enrich stops and cluster starts new clusters for borderline pairs.
+The tag stage adds tags from feed categories and keyword rules, with no LLM. It tags each article once (`tagged_at`), so a tag you remove in the web app stays removed. A new keyword rule reaches older articles through the 30-day backfill when you save it. The enrich stage uses Claude (`LLM_MODEL`, default `claude-haiku-5-5`) to translate each article into English, add up to three tags from the starter list, and write one English headline per cluster. The cluster stage also asks Claude to confirm borderline pairs when a key is set. Without a key, enrich stops and cluster starts new clusters for borderline pairs.
 
 ## Quick start
 
@@ -52,7 +52,7 @@ make psql                   # open a psql shell on the dev database
 | `make run-worker STAGE=fetch` | Download feeds and store new articles (phases 1-2) |
 | `make run-worker STAGE=embed` | Embed every article that has no vector yet (phase 3) |
 | `make run-worker STAGE=cluster` | Group new articles into events (phase 4). Uses Claude for borderline pairs when `ANTHROPIC_API_KEY` is set |
-| `make run-worker STAGE=tag` | Add tags from feed categories and keyword rules (phase 5, no LLM) |
+| `make run-worker STAGE=tag` | Add tags from feed categories and keyword rules to new articles (phase 5, no LLM) |
 | `make run-worker STAGE=enrich` | Translate and tag new articles, and write cluster headlines with Claude (phase 5). Needs `ANTHROPIC_API_KEY` |
 
 The migration database test is skipped unless `TEST_DATABASE_URL` is set. It creates and drops its own database, so the role needs `CREATEDB`. Use the port from `DB_HOST_PORT`:

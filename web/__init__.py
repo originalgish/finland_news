@@ -12,7 +12,7 @@ from psycopg_pool import ConnectionPool
 
 from app.config import get_settings
 from web.helpers import LANGS, display, initials, time_ago
-from web.routes import clusters, feed, search, site, sources, tags, views
+from web.routes import admin, clusters, feed, search, site, sources, tags, views
 
 
 def create_app(database_url: str | None = None) -> Flask:
@@ -47,7 +47,9 @@ def create_app(database_url: str | None = None) -> Flask:
             g.db.rollback()
         transaction.close()
 
-    for blueprint in (feed.bp, clusters.bp, tags.bp, views.bp, sources.bp, search.bp, site.bp):
+    for blueprint in (
+        feed.bp, clusters.bp, tags.bp, views.bp, sources.bp, search.bp, site.bp, admin.bp
+    ):
         app.register_blueprint(blueprint)
 
     return app

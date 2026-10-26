@@ -56,7 +56,10 @@ def cluster_stage(conn: psycopg.Connection, settings: Settings) -> int:
 
 def tag_stage(conn: psycopg.Connection, settings: Settings) -> int:
     summary = apply_tags(conn)
-    print(f"tags added: {summary.feed} from feed categories, {summary.rules} from keyword rules")
+    print(
+        f"tagged {summary.articles} new articles: {summary.feed} tags from feed categories, "
+        f"{summary.rules} from keyword rules"
+    )
     return 0
 
 

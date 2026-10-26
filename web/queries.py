@@ -117,6 +117,24 @@ ORDER BY rank DESC, a.published_at DESC
 LIMIT 50
 """
 
+ADMIN_CLUSTERS_SQL = """
+SELECT id, headline, last_updated, article_count, source_count
+FROM clusters
+WHERE article_count > 1
+ORDER BY last_updated DESC, id DESC
+LIMIT %s
+"""
+
+ADMIN_MEMBERS_SQL = """
+SELECT a.cluster_id, a.id, a.title, a.title_en, a.published_at, s.name AS source_name,
+       1 - (a.embedding <=> c.centroid) AS similarity
+FROM articles a
+JOIN clusters c ON c.id = a.cluster_id
+JOIN sources s ON s.id = a.source_id
+WHERE a.cluster_id = ANY(%s)
+ORDER BY a.cluster_id, similarity ASC NULLS FIRST, a.id
+"""
+
 RULE_PREVIEW_SQL = """
 SELECT count(*) FROM articles
 WHERE published_at > now() - interval '7 days'
@@ -238,3 +256,22 @@ def search(conn: psycopg.Connection, query: str) -> list[dict[str, Any]]:
 
 def rule_preview_count(conn: psycopg.Connection, query: str) -> int:
     return conn.execute(RULE_PREVIEW_SQL, (query,)).fetchone()["count"]
+
+
+def admin_clusters(conn: psycopg.Connection, limit: int = 50) -> list[dict[str, Any]]:
+    """Recent multi-article clusters, each with its members' similarity to the centroid."""
+    return _with_members(conn, conn.execute(ADMIN_CLUSTERS_SQL, (limit,)).fetchall())
+
+
+def admin_cluster(conn: psycopg.Connection, cluster_id: int) -> dict[str, Any] | None:
+    row = cluster(conn, cluster_id)
+    return _with_members(conn, [row])[0] if row else None
+
+
+def _with_members(conn: psycopg.Connection, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not rows:
+        return []
+    members: dict[int, list[dict[str, Any]]] = {}
+    for row in conn.execute(ADMIN_MEMBERS_SQL, ([r["id"] for r in rows],)).fetchall():
+        members.setdefault(row["cluster_id"], []).append(row)
+    return [{**row, "members": members.get(row["id"], [])} for row in rows]
