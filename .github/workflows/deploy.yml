@@ -17,6 +17,9 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   deploy:
+    # A manual run from another branch still runs CI, but it never deploys, because the
+    # server deploys whatever main it has pulled.
+    if: github.ref == 'refs/heads/main'
     needs: ci
     runs-on: ubuntu-latest
     environment: production
@@ -39,4 +42,7 @@ jobs:
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
-        run: ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes "$SSH_USER@$SSH_HOST"
+        run: |
+          : "${SSH_HOST:?Add SSH_HOST to the production environment secrets}"
+          : "${SSH_USER:?Add SSH_USER to the production environment secrets}"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes "$SSH_USER@$SSH_HOST"

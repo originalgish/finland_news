@@ -107,7 +107,7 @@ Run `scripts/restore-check.sh` again after any schema change. It restores into a
 
 ## 6. Continuous deployment
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) runs lint and the tests on every push and pull request, against a pgvector Postgres. [.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs the same checks on each push to `main`, then connects to the server over SSH and runs `scripts/deploy.sh`. A failed `/healthz` check fails the workflow. To deploy again without a push, run the Deploy workflow from the Actions tab.
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs lint and the tests on every push and pull request, against a pgvector Postgres. [.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs the same checks on each push to `main`, then connects to the server over SSH and runs `scripts/deploy.sh`. A failed `/healthz` check fails the workflow. To deploy again without a push, run the Deploy workflow from the Actions tab with `main` selected. A run from any other branch runs CI only.
 
 Do the first deploy by hand (section 3) before you set this up.
 
