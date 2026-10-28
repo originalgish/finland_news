@@ -96,10 +96,12 @@ The backup runs from the server's crontab, not from the worker, because the dump
 
    The server clock is UTC by default. 02:30 UTC is 04:30 in Helsinki in winter and 05:30 in summer. Either is fine.
 
-5. In healthchecks.io, create three checks:
-   - **run**: period 12 hours, grace 1 hour. Its URL is `HC_FETCH_URL`, which the pipeline pings.
-   - **digest**: period 1 day, grace 1 hour. Its URL is `HC_DIGEST_URL`.
-   - **backup**: period 1 day, grace 1 hour. Its URL is `HC_BACKUP_URL`. The script pings `/fail` when any step fails.
+5. In healthchecks.io, create three checks with the **Cron** schedule type, each with a grace time of 1 hour. A simple period does not fit `run`. It runs at 06:00 and 17:00, so the gap overnight is 13 hours, and a 12-hour period would alert every morning.
+   - **run**: cron `0 6,17 * * *`, time zone `Europe/Helsinki`. Its URL is `HC_FETCH_URL`, which the pipeline pings.
+   - **digest**: cron `30 6 * * *`, time zone `Europe/Helsinki`. Its URL is `HC_DIGEST_URL`.
+   - **backup**: cron `30 2 * * *`, time zone `UTC`, the server clock. Its URL is `HC_BACKUP_URL`. The script pings `/fail` when any step fails.
+
+   The first two match [worker/crontab](worker/crontab), and the last matches the server crontab line in step 4. Change them together.
 
 6. Turn on weekly server snapshots in the Hetzner console (the backups add-on, or manual snapshots). They are not automated here.
 
@@ -107,7 +109,7 @@ Run `scripts/restore-check.sh` again after any schema change. It restores into a
 
 ## 6. Continuous deployment
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) runs lint and the tests on every push and pull request, against a pgvector Postgres. [.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs the same checks on each push to `main`, then connects to the server over SSH and runs `scripts/deploy.sh`. A failed `/healthz` check fails the workflow. To deploy again without a push, run the Deploy workflow from the Actions tab.
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs lint and the tests on every push and pull request, against a pgvector Postgres. [.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs the same checks on each push to `main`, then connects to the server over SSH and runs `scripts/deploy.sh`. A failed `/healthz` check fails the workflow. To deploy again without a push, run the Deploy workflow from the Actions tab with `main` selected. A run from any other branch runs CI only.
 
 Do the first deploy by hand (section 3) before you set this up.
 
